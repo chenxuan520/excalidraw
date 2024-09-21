@@ -8,6 +8,7 @@ import {
   FontFamilyCodeIcon,
   FontFamilyNormalIcon,
   FreedrawIcon,
+  FontFamilyChineseIcon,
 } from "../icons";
 import { ButtonSeparator } from "../ButtonSeparator";
 import type { FontFamilyValues } from "../../element/types";
@@ -34,6 +35,12 @@ export const DEFAULT_FONTS = [
     icon: FontFamilyCodeIcon,
     text: t("labels.code"),
     testId: "font-family-code",
+  },
+  {
+    value: FONT_FAMILY.Yutong,
+    icon: FontFamilyChineseIcon,
+    text: t("labels.normal"),
+    testId: "font-family-yutong",
   },
 ];
 

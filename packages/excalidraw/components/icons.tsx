@@ -1473,6 +1473,22 @@ export const FontFamilyNormalIcon = createIcon(
   modifiedTablerIconProps,
 );
 
+export const FontFamilyChineseIcon = createIcon(
+  <>
+    <g
+      stroke="currentColor"
+      strokeWidth="1.25"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M21 20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.49a1 1 0 0 1 .386-.79l8-6.222a1 1 0 0 1 1.228 0l8 6.222a1 1 0 0 1 .386.79V20zm-2-1V9.978l-7-5.444-7 5.444V19h14z"/>
+    </g>
+  </>,
+  modifiedTablerIconProps,
+);
+
+
+
 export const FontFamilyCodeIcon = createIcon(
   <>
     <g
