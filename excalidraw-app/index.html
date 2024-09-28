@@ -136,33 +136,54 @@
 
     <!-- Preload all default fonts and Virgil for backwards compatibility to avoid swap on init -->
     <% if (typeof PROD != 'undefined' && PROD == true) { %>
+    <!--<link-->
+    <!--  rel="preload"-->
+    <!--  href="https://excalidraw.nyc3.cdn.digitaloceanspaces.com/fonts/oss/Excalifont-Regular-C9eKQy_N.woff2"-->
+    <!--  as="font"-->
+    <!--  type="font/woff2"-->
+    <!--  crossorigin="anonymous"-->
+    <!--/>-->
+    <!--<link-->
+    <!--  rel="preload"-->
+    <!--  href="https://excalidraw.nyc3.cdn.digitaloceanspaces.com/fonts/oss/Virgil-Regular-hO16qHwV.woff2"-->
+    <!--  as="font"-->
+    <!--  type="font/woff2"-->
+    <!--  crossorigin="anonymous"-->
+    <!--/>-->
+    <!--<link-->
+    <!--  rel="preload"-->
+    <!--  href="https://excalidraw.nyc3.cdn.digitaloceanspaces.com/fonts/oss/ComicShanns-Regular-D0c8wzsC.woff2"-->
+    <!--  as="font"-->
+    <!--  type="font/woff2"-->
+    <!--  crossorigin="anonymous"-->
+    <!--/>-->
     <link
       rel="preload"
-      href="https://excalidraw.nyc3.cdn.digitaloceanspaces.com/fonts/oss/Excalifont-Regular-C9eKQy_N.woff2"
+      href="../packages/excalidraw/fonts/assets/Excalifont-Regular.woff2"
       as="font"
       type="font/woff2"
       crossorigin="anonymous"
     />
     <link
       rel="preload"
-      href="https://excalidraw.nyc3.cdn.digitaloceanspaces.com/fonts/oss/Virgil-Regular-hO16qHwV.woff2"
+      href="../packages/excalidraw/fonts/assets/Virgil-Regular.woff2"
       as="font"
       type="font/woff2"
       crossorigin="anonymous"
     />
     <link
       rel="preload"
-      href="https://excalidraw.nyc3.cdn.digitaloceanspaces.com/fonts/oss/ComicShanns-Regular-D0c8wzsC.woff2"
+      href="../packages/excalidraw/fonts/assets/ComicShanns-Regular.woff2"
       as="font"
       type="font/woff2"
       crossorigin="anonymous"
     />
     <link
-    rel="preload"
-    href="../packages/excalidraw/fonts/assets/Yutong.ttf"
-    as="font"
-    type="font/ttf"
-    crossorigin="anonymous"
+      rel="preload"
+      href="../packages/excalidraw/fonts/assets/Yutong.ttf"
+      as="font"
+      type="font/ttf"
+      crossorigin="anonymous"
     />
     <% } else { %>
     <!-- in DEV we need to preload from the local server and without the hash -->
@@ -185,6 +206,13 @@
       href="../packages/excalidraw/fonts/assets/ComicShanns-Regular.woff2"
       as="font"
       type="font/woff2"
+      crossorigin="anonymous"
+    />
+    <link
+      rel="preload"
+      href="../packages/excalidraw/fonts/assets/Yutong.ttf"
+      as="font"
+      type="font/ttf"
       crossorigin="anonymous"
     />
     <% } %>
@@ -279,37 +307,5 @@
     </header>
     <div id="root"></div>
     <script type="module" src="index.tsx"></script>
-    <!-- 100% privacy friendly analytics -->
-    <script>
-      // need to load this script dynamically bcs. of iframe embed tracking
-      var scriptEle = document.createElement("script");
-      scriptEle.setAttribute(
-        "src",
-        "https://scripts.simpleanalyticscdn.com/latest.js",
-      );
-      scriptEle.setAttribute("type", "text/javascript");
-      scriptEle.setAttribute("defer", true);
-      scriptEle.setAttribute("async", true);
-      // if iframe
-      if (window.self !== window.top) {
-        scriptEle.setAttribute("data-auto-collect", true);
-      }
-
-      document.body.appendChild(scriptEle);
-
-      // if iframe
-      if (window.self !== window.top) {
-        scriptEle.addEventListener("load", () => {
-          if (window.sa_pageview) {
-            window.window.sa_event(action, {
-              category: "iframe",
-              label: "embed",
-              value: window.location.pathname,
-            });
-          }
-        });
-      }
-    </script>
-    <!-- end LEGACY GOOGLE ANALYTICS -->
   </body>
 </html>
