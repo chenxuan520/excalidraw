@@ -52,6 +52,17 @@
   </figure>
 </div>
 
+---
+
+# 本仓库改进点
+1. 支持使用中文字体
+2. 支持latex公式
+3. 支持嵌入网页所有url(原仓库只支持部分url)
+4. 自动打包成前端静态文件在 release 中, 下载可直接使用
+5. 删除跟踪统计数据的部分
+
+---
+
 ## Features
 
 The Excalidraw editor (npm package) supports:
