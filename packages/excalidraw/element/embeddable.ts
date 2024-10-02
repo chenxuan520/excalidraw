@@ -46,31 +46,11 @@ const RE_GIPHY =
   /giphy.com\/(?:clips|embed|gifs)\/[a-zA-Z0-9]*?-?([a-zA-Z0-9]+)(?:[^a-zA-Z0-9]|$)/;
 
 const ALLOWED_DOMAINS = new Set([
-  "youtube.com",
-  "youtu.be",
-  "vimeo.com",
-  "player.vimeo.com",
-  "figma.com",
-  "link.excalidraw.com",
-  "gist.github.com",
-  "twitter.com",
-  "x.com",
-  "*.simplepdf.eu",
-  "stackblitz.com",
-  "val.town",
-  "giphy.com",
+  "*.*",
 ]);
 
 const ALLOW_SAME_ORIGIN = new Set([
-  "youtube.com",
-  "youtu.be",
-  "vimeo.com",
-  "player.vimeo.com",
-  "figma.com",
-  "twitter.com",
-  "x.com",
-  "*.simplepdf.eu",
-  "stackblitz.com",
+  "*.*",
 ]);
 
 export const createSrcDoc = (body: string) => {
@@ -384,31 +364,33 @@ export const embeddableURLValidator = (
 ): boolean => {
   if (!url) {
     return false;
+  }else{
+    return true;
   }
-  if (validateEmbeddable != null) {
-    if (typeof validateEmbeddable === "function") {
-      const ret = validateEmbeddable(url);
-      // if return value is undefined, leave validation to default
-      if (typeof ret === "boolean") {
-        return ret;
-      }
-    } else if (typeof validateEmbeddable === "boolean") {
-      return validateEmbeddable;
-    } else if (validateEmbeddable instanceof RegExp) {
-      return validateEmbeddable.test(url);
-    } else if (Array.isArray(validateEmbeddable)) {
-      for (const domain of validateEmbeddable) {
-        if (domain instanceof RegExp) {
-          if (url.match(domain)) {
-            return true;
-          }
-        } else if (matchHostname(url, domain)) {
-          return true;
-        }
-      }
-      return false;
-    }
-  }
+  // if (validateEmbeddable != null) {
+  //   if (typeof validateEmbeddable === "function") {
+  //     const ret = validateEmbeddable(url);
+  //     // if return value is undefined, leave validation to default
+  //     if (typeof ret === "boolean") {
+  //       return ret;
+  //     }
+  //   } else if (typeof validateEmbeddable === "boolean") {
+  //     return validateEmbeddable;
+  //   } else if (validateEmbeddable instanceof RegExp) {
+  //     return validateEmbeddable.test(url);
+  //   } else if (Array.isArray(validateEmbeddable)) {
+  //     for (const domain of validateEmbeddable) {
+  //       if (domain instanceof RegExp) {
+  //         if (url.match(domain)) {
+  //           return true;
+  //         }
+  //       } else if (matchHostname(url, domain)) {
+  //         return true;
+  //       }
+  //     }
+  //     return false;
+  //   }
+  // }
 
-  return !!matchHostname(url, ALLOWED_DOMAINS);
+  // return !!matchHostname(url, ALLOWED_DOMAINS);
 };
