@@ -32,6 +32,22 @@ export const exportToExcalidrawPlus = async (
   files: BinaryFiles,
   name: string,
 ) => {
+
+  // 这部分改成将这个 blob 向 webdev 中上传
+  // TODO
+  // await fetch('https://webdev.example.com/upload', {
+  //   method: 'POST',
+  //   headers: {
+  //     'Content-Type': 'application/octet-stream',
+  //     'X-Custom-Metadata': JSON.stringify({
+  //       version: 2,
+  //       name,
+  //       created: Date.now().toString(),
+  //     }),
+  //   },
+  //   body: serializeAsJSON(elements, appState, files, "database"),
+  // });
+
   const firebase = await loadFirebaseStorage();
 
   const id = `${nanoid(12)}`;
