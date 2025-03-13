@@ -33,20 +33,16 @@ export const exportToExcalidrawPlus = async (
   name: string,
 ) => {
 
-  // 这部分改成将这个 blob 向 webdev 中上传
+  // 这部分改成将这个 blob 向 /api/upload 中上传, 通过 body 的方式
   // TODO
-  // await fetch('https://webdev.example.com/upload', {
-  //   method: 'POST',
-  //   headers: {
-  //     'Content-Type': 'application/octet-stream',
-  //     'X-Custom-Metadata': JSON.stringify({
-  //       version: 2,
-  //       name,
-  //       created: Date.now().toString(),
-  //     }),
-  //   },
-  //   body: serializeAsJSON(elements, appState, files, "database"),
-  // });
+  const body=serializeAsJSON(elements, appState, files, "database")
+  // 上传到 /api/upload
+  const res = await fetch("http://127.0.0.1:5203/api/upload", {
+    method: "POST",
+    body: body,
+  });
+  const data = await res.json();
+  console.log(data);
 
   const firebase = await loadFirebaseStorage();
 

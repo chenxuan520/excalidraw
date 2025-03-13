@@ -16,11 +16,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18.x
-      - name: Install and test
+      - name: Install and test # use `npm run serve` to test
         run: |
           yarn install
           cd excalidraw-app
           yarn build
+          
           tar -zcvf excalidraw-app.tar.gz ./build
           mv ./excalidraw-app.tar.gz ..
       - name: Release
