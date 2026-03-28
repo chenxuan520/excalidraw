@@ -63,6 +63,28 @@ vi.mock("socket.io-client", () => {
   };
 });
 
+const installCollabHarness = () => {
+  const updateScene = (data: Parameters<typeof h.app.updateScene>[0]) => {
+    h.app.updateScene(data);
+  };
+
+  Object.defineProperty(window, "collab", {
+    configurable: true,
+    value: {
+      excalidrawAPI: {
+        updateScene,
+      },
+      startCollaboration: vi.fn(async () => {
+        h.app.updateScene({
+          elements: h.elements.filter((element) => !element.isDeleted),
+          storeAction: StoreAction.UPDATE,
+        });
+        return null;
+      }),
+    },
+  });
+};
+
 /**
  * These test would deserve to be extended by testing collab with (at least) two clients simultanouesly,
  * while having access to both scenes, appstates stores, histories and etc.
@@ -71,6 +93,7 @@ vi.mock("socket.io-client", () => {
 describe("collaboration", () => {
   it("should allow to undo / redo even on force-deleted elements", async () => {
     await render(<ExcalidrawApp />);
+    installCollabHarness();
     const rect1Props = {
       type: "rectangle",
       id: "A",

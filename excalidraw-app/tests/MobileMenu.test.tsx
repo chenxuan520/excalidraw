@@ -5,6 +5,7 @@ import {
   restoreOriginalGetBoundingClientRect,
 } from "../../packages/excalidraw/tests/test-utils";
 
+import { screen } from "@testing-library/react";
 import { UI } from "../../packages/excalidraw/tests/helpers/ui";
 
 describe("Test MobileMenu", () => {
@@ -44,7 +45,10 @@ describe("Test MobileMenu", () => {
   });
 
   it("should initialize with welcome screen and hide once user interacts", async () => {
-    expect(document.querySelector(".welcome-screen-center")).toMatchSnapshot();
+    expect(document.querySelector(".welcome-screen-center")).not.toBeNull();
+    expect(screen.getByText("Open")).toBeVisible();
+    expect(screen.getByText("Help")).toBeVisible();
+    expect(screen.getByText("在线模式")).toBeVisible();
     UI.clickTool("rectangle");
     expect(document.querySelector(".welcome-screen-center")).toBeNull();
   });
