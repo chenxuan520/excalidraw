@@ -1,7 +1,6 @@
 import polyfill from "../packages/excalidraw/polyfill";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { trackEvent } from "../packages/excalidraw/analytics";
-import { getDefaultAppState } from "../packages/excalidraw/appState";
 import { ErrorDialog } from "../packages/excalidraw/components/ErrorDialog";
 import { TopErrorBoundary } from "./components/TopErrorBoundary";
 import { useMathSubtype } from "../packages/excalidraw/element/subtypes/mathjax";
@@ -13,6 +12,7 @@ import {
   VERSION_TIMEOUT,
 } from "../packages/excalidraw/constants";
 import { loadFromBlob } from "../packages/excalidraw/data/blob";
+import { serializeAsJSON } from "../packages/excalidraw/data/json";
 import type {
   FileId,
   NonDeletedExcalidrawElement,
@@ -22,7 +22,6 @@ import { useCallbackRefState } from "../packages/excalidraw/hooks/useCallbackRef
 import { t } from "../packages/excalidraw/i18n";
 import {
   Excalidraw,
-  LiveCollaborationTrigger,
   TTDDialog,
   TTDDialogTrigger,
   StoreAction,
@@ -47,18 +46,12 @@ import {
 } from "../packages/excalidraw/utils";
 import {
   FIREBASE_STORAGE_PREFIXES,
-  isExcalidrawPlusSignedUser,
   STORAGE_KEYS,
   SYNC_BROWSER_TABS_TIMEOUT,
 } from "./app_constants";
 import type { CollabAPI } from "./collab/Collab";
-import Collab, {
-  collabAPIAtom,
-  isCollaboratingAtom,
-  isOfflineAtom,
-} from "./collab/Collab";
+import { collabAPIAtom, isCollaboratingAtom } from "./collab/Collab";
 import {
-  exportToBackend,
   getCollaborationLinkData,
   isCollaborationLink,
   loadScene,
@@ -66,14 +59,13 @@ import {
 import {
   importFromLocalStorage,
   importUsernameFromLocalStorage,
+  importWebDAVConfigFromLocalStorage,
+  saveWebDAVConfigToLocalStorage,
+  clearWebDAVConfigFromLocalStorage,
 } from "./data/localStorage";
 import CustomStats from "./CustomStats";
 import type { RestoredDataState } from "../packages/excalidraw/data/restore";
 import { restore, restoreAppState } from "../packages/excalidraw/data/restore";
-import {
-  ExportToExcalidrawPlus,
-  exportToExcalidrawPlus,
-} from "./components/ExportToExcalidrawPlus";
 import { updateStaleImageStatuses } from "./data/FileManager";
 import { newElementWith } from "../packages/excalidraw/element/mutateElement";
 import { isInitializedImageElement } from "../packages/excalidraw/element/typeChecks";
@@ -92,18 +84,14 @@ import {
 import { AppMainMenu } from "./components/AppMainMenu";
 import { AppWelcomeScreen } from "./components/AppWelcomeScreen";
 import { AppFooter } from "./components/AppFooter";
-import { Provider, useAtom, useAtomValue } from "jotai";
+import { Provider, useAtom } from "jotai";
 import { useAtomWithInitialValue } from "../packages/excalidraw/jotai";
 import { appJotaiStore } from "./app-jotai";
 
 import "./index.scss";
 import type { ResolutionType } from "../packages/excalidraw/utility-types";
-import { ShareableLinkDialog } from "../packages/excalidraw/components/ShareableLinkDialog";
 import { openConfirmModal } from "../packages/excalidraw/components/OverwriteConfirm/OverwriteConfirmState";
 import { OverwriteConfirmDialog } from "../packages/excalidraw/components/OverwriteConfirm/OverwriteConfirm";
-import Trans from "../packages/excalidraw/components/Trans";
-import { ShareDialog, shareDialogStateAtom } from "./share/ShareDialog";
-import CollabError, { collabErrorIndicatorAtom } from "./collab/CollabError";
 import type { RemoteExcalidrawElement } from "../packages/excalidraw/data/reconcile";
 import {
   CommandPalette,
@@ -113,15 +101,36 @@ import {
   GithubIcon,
   XBrandIcon,
   DiscordIcon,
-  ExcalLogo,
-  usersIcon,
-  exportToPlus,
-  share,
+  loginIcon,
+  LibraryIcon,
+  ExportIcon,
   youtubeIcon,
 } from "../packages/excalidraw/components/icons";
 import { appThemeAtom, useHandleAppTheme } from "./useHandleAppTheme";
 import { getPreferredLanguage } from "./app-language/language-detector";
 import { useAppLangCode } from "./app-language/language-state";
+import {
+  createEmptyExcalidrawContent,
+  createWebDAVFile,
+  deleteWebDAVFile,
+  downloadWebDAVFile,
+  fileNameFromRemotePath,
+  listExcalidrawFiles,
+  renameWebDAVFile,
+  uploadWebDAVFile,
+  validateWebDAVConfig,
+} from "./data/webdav";
+import {
+  initialWebDAVSessionState,
+  webdavFileManagerOpenAtom,
+  webdavFilesAtom,
+  webdavLoginDialogOpenAtom,
+  webdavSessionAtom,
+} from "./webdav/state";
+import type { WebDAVConfig, WebDAVFileEntry } from "./webdav/state";
+import { WebDAVTopRight } from "./webdav/WebDAVTopRight";
+import { WebDAVLoginDialog } from "./webdav/WebDAVLoginDialog";
+import { WebDAVFileManagerDialog } from "./webdav/WebDAVFileManagerDialog";
 
 polyfill();
 
@@ -173,19 +182,6 @@ if (window.self !== window.top) {
   }
 }
 
-const shareableLinkConfirmDialog = {
-  title: t("overwriteConfirm.modal.shareableLink.title"),
-  description: (
-    <Trans
-      i18nKey="overwriteConfirm.modal.shareableLink.description"
-      bold={(text) => <strong>{text}</strong>}
-      br={() => <br />}
-    />
-  ),
-  actionLabel: t("overwriteConfirm.modal.shareableLink.button"),
-  color: "danger",
-} as const;
-
 const initializeScene = async (opts: {
   collabAPI: CollabAPI | null;
   excalidrawAPI: ExcalidrawImperativeAPI;
@@ -217,7 +213,12 @@ const initializeScene = async (opts: {
       // don't prompt for collab scenes because we don't override local storage
       roomLinkData ||
       // otherwise, prompt whether user wants to override current scene
-      (await openConfirmModal(shareableLinkConfirmDialog))
+      (await openConfirmModal({
+        title: t("overwriteConfirm.modal.shareableLink.title"),
+        description: t("overwriteConfirm.modal.shareableLink.description"),
+        actionLabel: t("overwriteConfirm.modal.shareableLink.button"),
+        color: "danger",
+      }))
     ) {
       if (jsonBackendMatch) {
         scene = await loadScene(
@@ -256,7 +257,12 @@ const initializeScene = async (opts: {
       const data = await loadFromBlob(await request.blob(), null, null);
       if (
         !scene.elements.length ||
-        (await openConfirmModal(shareableLinkConfirmDialog))
+        (await openConfirmModal({
+          title: t("overwriteConfirm.modal.shareableLink.title"),
+          description: t("overwriteConfirm.modal.shareableLink.description"),
+          actionLabel: t("overwriteConfirm.modal.shareableLink.button"),
+          color: "danger",
+        }))
       ) {
         return { scene: data, isExternalScene };
       }
@@ -327,6 +333,19 @@ const ExcalidrawWrapper = () => {
 
   const [langCode, setLangCode] = useAppLangCode();
 
+  const [webdavSession, setWebdavSession] = useAtom(webdavSessionAtom);
+  const [webdavFiles, setWebdavFiles] = useAtom(webdavFilesAtom);
+  const [isWebDAVLoginOpen, setWebDAVLoginOpen] = useAtom(
+    webdavLoginDialogOpenAtom,
+  );
+  const [isWebDAVFileManagerOpen, setWebDAVFileManagerOpen] = useAtom(
+    webdavFileManagerOpenAtom,
+  );
+  const hasRestoredWebDAVSessionRef = useRef(false);
+  const isApplyingRemoteSceneRef = useRef(false);
+  const ignoreNextWebDAVChangeRef = useRef(false);
+  const lastSyncedWebDAVContentRef = useRef<string | null>(null);
+
   // initial state
   // ---------------------------------------------------------------------------
 
@@ -351,12 +370,10 @@ const ExcalidrawWrapper = () => {
 
   useMathSubtype(excalidrawAPI);
 
-  const [, setShareDialogState] = useAtom(shareDialogStateAtom);
   const [collabAPI] = useAtom(collabAPIAtom);
   const [isCollaborating] = useAtomWithInitialValue(isCollaboratingAtom, () => {
     return isCollaborationLink(window.location.href);
   });
-  const collabError = useAtomValue(collabErrorIndicatorAtom);
 
   useHandleLibrary({
     excalidrawAPI,
@@ -365,8 +382,435 @@ const ExcalidrawWrapper = () => {
     migrationAdapter: LibraryLocalStorageMigrationAdapter,
   });
 
+  const refreshWebDAVFiles = useCallback(
+    async (config = webdavSession.config) => {
+      if (!config) {
+        setWebdavFiles([]);
+        return [];
+      }
+      const files = await listExcalidrawFiles(config);
+      setWebdavFiles(files);
+      return files;
+    },
+    [setWebdavFiles, webdavSession.config],
+  );
+
+  const updateStoredWebDAVSession = useCallback(
+    (activeFilePath: string | null, config = webdavSession.config) => {
+      if (!config) {
+        return;
+      }
+      saveWebDAVConfigToLocalStorage(config, activeFilePath);
+    },
+    [webdavSession.config],
+  );
+
+  const loadWebDAVFile = useCallback(
+    async (path: string) => {
+      if (!excalidrawAPI || !webdavSession.config) {
+        return;
+      }
+      const existingElements = excalidrawAPI.getSceneElements();
+      if (
+        (existingElements.length > 0 || webdavSession.remoteDirty) &&
+        !(await openConfirmModal({
+          title: t("overwriteConfirm.modal.shareableLink.title"),
+          description: t("overwriteConfirm.modal.shareableLink.description"),
+          actionLabel: t("overwriteConfirm.modal.shareableLink.button"),
+          color: "danger",
+        }))
+      ) {
+        return;
+      }
+
+      const targetFile = webdavFiles.find((file) => file.path === path) || null;
+      setWebdavSession((current) => ({
+        ...current,
+        isLoadingFile: true,
+        error: null,
+      }));
+      try {
+        const blob = await downloadWebDAVFile(webdavSession.config, path);
+        const data = await loadFromBlob(
+          blob,
+          excalidrawAPI.getAppState(),
+          excalidrawAPI.getSceneElementsIncludingDeleted(),
+        );
+        isApplyingRemoteSceneRef.current = true;
+        excalidrawAPI.addFiles(Object.values(data.files || {}));
+        excalidrawAPI.updateScene({
+          elements: data.elements,
+          appState: data.appState,
+          storeAction: StoreAction.CAPTURE,
+        });
+        const activeFile =
+          targetFile ||
+          ({
+            path,
+            href: path,
+            name: fileNameFromRemotePath(path),
+            etag: null,
+            lastModified: null,
+            size: null,
+          } as const);
+        setWebdavSession((current) => ({
+          ...current,
+          activeFile,
+          remoteDirty: false,
+          isLoadingFile: false,
+        }));
+        lastSyncedWebDAVContentRef.current = serializeAsJSON(
+          data.elements,
+          {
+            ...data.appState,
+            name: activeFile.name.replace(/\.excalidraw$/, ""),
+          },
+          data.files || {},
+          "local",
+        );
+        excalidrawAPI.updateScene({
+          appState: {
+            name: activeFile.name.replace(/\.excalidraw$/, ""),
+          },
+          storeAction: StoreAction.UPDATE,
+        });
+        updateStoredWebDAVSession(path);
+        excalidrawAPI.setToast({ message: `已加载 ${activeFile.name}` });
+      } catch (error: any) {
+        setWebdavSession((current) => ({
+          ...current,
+          isLoadingFile: false,
+          error: error.message || "加载 WebDAV 文件失败",
+        }));
+        throw error;
+      } finally {
+        window.setTimeout(() => {
+          isApplyingRemoteSceneRef.current = false;
+        }, 0);
+      }
+    },
+    [
+      excalidrawAPI,
+      updateStoredWebDAVSession,
+      webdavFiles,
+      webdavSession.config,
+      webdavSession.remoteDirty,
+      setWebdavSession,
+    ],
+  );
+
+  const handleWebDAVLogin = useCallback(
+    async (config: WebDAVConfig) => {
+      const normalizedConfig = {
+        ...config,
+        serverUrl: config.serverUrl.trim(),
+        basePath: config.basePath.trim() || "/",
+        username: config.username.trim(),
+        password: config.password,
+      };
+      setWebdavSession((current) => ({
+        ...current,
+        isConnecting: true,
+        error: null,
+      }));
+      try {
+        await validateWebDAVConfig(normalizedConfig);
+        const files = await listExcalidrawFiles(normalizedConfig);
+        const stored = importWebDAVConfigFromLocalStorage();
+        const nextActiveFile =
+          files.find((file) => file.path === stored?.activeFilePath) || null;
+        setWebdavFiles(files);
+        setWebdavSession({
+          loggedIn: true,
+          config: normalizedConfig,
+          activeFile: nextActiveFile,
+          isConnecting: false,
+          isSaving: false,
+          isLoadingFile: false,
+          remoteDirty: false,
+          error: null,
+        });
+        saveWebDAVConfigToLocalStorage(
+          normalizedConfig,
+          nextActiveFile?.path || null,
+        );
+        setWebDAVLoginOpen(false);
+        if (nextActiveFile && excalidrawAPI) {
+          await loadWebDAVFile(nextActiveFile.path);
+        }
+      } catch (error: any) {
+        setWebdavSession((current) => ({
+          ...current,
+          isConnecting: false,
+          error: error.message || "WebDAV 登录失败",
+        }));
+      }
+    },
+    [
+      excalidrawAPI,
+      loadWebDAVFile,
+      setWebDAVLoginOpen,
+      setWebdavFiles,
+      setWebdavSession,
+    ],
+  );
+
+  const handleWebDAVLogout = useCallback(async () => {
+    const confirmed = await openConfirmModal({
+      title: "退出在线模式",
+      description: "确认退出登录吗？已保存的 WebDAV 登录信息也会一并清除。",
+      actionLabel: "退出登录",
+      color: "danger",
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    clearWebDAVConfigFromLocalStorage();
+    setWebdavFiles([]);
+    setWebdavSession(initialWebDAVSessionState);
+    setWebDAVFileManagerOpen(false);
+    setWebDAVLoginOpen(false);
+    excalidrawAPI?.updateScene({
+      appState: {
+        name: "",
+      },
+      storeAction: StoreAction.UPDATE,
+    });
+    excalidrawAPI?.setToast({ message: "已退出在线模式" });
+  }, [
+    excalidrawAPI,
+    setWebDAVFileManagerOpen,
+    setWebDAVLoginOpen,
+    setWebdavFiles,
+    setWebdavSession,
+  ]);
+
+  const saveCurrentSceneToWebDAV = useCallback(
+    async (targetPath?: string | null) => {
+      if (!excalidrawAPI || !webdavSession.config) {
+        return;
+      }
+      const resolvedPath = targetPath || webdavSession.activeFile?.path;
+      if (!resolvedPath) {
+        setWebDAVFileManagerOpen(true);
+        excalidrawAPI.setToast({
+          message: "请先在管理文件中创建或选择一个云端文件",
+        });
+        return;
+      }
+      setWebdavSession((current) => ({
+        ...current,
+        isSaving: true,
+        error: null,
+      }));
+      try {
+        const content = serializeAsJSON(
+          excalidrawAPI.getSceneElements(),
+          excalidrawAPI.getAppState(),
+          excalidrawAPI.getFiles(),
+          "local",
+        );
+        await uploadWebDAVFile(webdavSession.config, resolvedPath, content);
+        const files = await refreshWebDAVFiles(webdavSession.config);
+        const activeFile =
+          files.find((file) => file.path === resolvedPath) ||
+          webdavSession.activeFile;
+        const normalizedSyncedState = {
+          ...excalidrawAPI.getAppState(),
+          name: activeFile?.name.replace(/\.excalidraw$/, "") || "",
+        };
+        const syncedContent = serializeAsJSON(
+          excalidrawAPI.getSceneElements(),
+          normalizedSyncedState,
+          excalidrawAPI.getFiles(),
+          "local",
+        );
+        setWebdavSession((current) => ({
+          ...current,
+          activeFile: activeFile || null,
+          isSaving: false,
+          remoteDirty: false,
+          error: null,
+        }));
+        lastSyncedWebDAVContentRef.current = syncedContent;
+        updateStoredWebDAVSession(resolvedPath, webdavSession.config);
+        ignoreNextWebDAVChangeRef.current = true;
+        window.setTimeout(() => {
+          excalidrawAPI.setToast({ message: "已保存到云端", duration: 1500 });
+        }, 0);
+      } catch (error: any) {
+        setWebdavSession((current) => ({
+          ...current,
+          isSaving: false,
+          error: error.message || "保存 WebDAV 文件失败",
+        }));
+      }
+    },
+    [
+      excalidrawAPI,
+      refreshWebDAVFiles,
+      setWebDAVFileManagerOpen,
+      setWebdavSession,
+      updateStoredWebDAVSession,
+      webdavSession.activeFile,
+      webdavSession.config,
+    ],
+  );
+
+  const handleCreateEmptyWebDAVFile = useCallback(
+    async (fileName: string) => {
+      if (!webdavSession.config || !fileName.trim()) {
+        return;
+      }
+      const remotePath = await createWebDAVFile(
+        webdavSession.config,
+        fileName,
+        createEmptyExcalidrawContent(fileName),
+      );
+      const files = await refreshWebDAVFiles(webdavSession.config);
+      setWebdavSession((current) => ({
+        ...current,
+        activeFile: files.find((file) => file.path === remotePath) || null,
+        remoteDirty: false,
+      }));
+      updateStoredWebDAVSession(remotePath, webdavSession.config);
+      await loadWebDAVFile(remotePath);
+    },
+    [
+      loadWebDAVFile,
+      refreshWebDAVFiles,
+      setWebdavSession,
+      updateStoredWebDAVSession,
+      webdavSession.config,
+    ],
+  );
+
+  const handleSaveCurrentAsNewWebDAVFile = useCallback(
+    async (fileName: string) => {
+      if (!excalidrawAPI || !webdavSession.config || !fileName.trim()) {
+        return;
+      }
+      const content = serializeAsJSON(
+        excalidrawAPI.getSceneElements(),
+        excalidrawAPI.getAppState(),
+        excalidrawAPI.getFiles(),
+        "local",
+      );
+      const remotePath = await createWebDAVFile(
+        webdavSession.config,
+        fileName,
+        content,
+      );
+      const files = await refreshWebDAVFiles(webdavSession.config);
+      const activeFile = files.find((file) => file.path === remotePath) || null;
+      setWebdavSession((current) => ({
+        ...current,
+        activeFile,
+        remoteDirty: false,
+      }));
+      updateStoredWebDAVSession(remotePath, webdavSession.config);
+      excalidrawAPI.setToast({ message: "已创建云端文件" });
+    },
+    [
+      excalidrawAPI,
+      refreshWebDAVFiles,
+      setWebdavSession,
+      updateStoredWebDAVSession,
+      webdavSession.config,
+    ],
+  );
+
+  const handleRenameWebDAVFile = useCallback(
+    async (file: WebDAVFileEntry, nextName: string) => {
+      if (!webdavSession.config || !nextName.trim()) {
+        return;
+      }
+      const nextPath = await renameWebDAVFile(
+        webdavSession.config,
+        file.path,
+        nextName,
+      );
+      const files = await refreshWebDAVFiles(webdavSession.config);
+      const activeFile =
+        webdavSession.activeFile?.path === file.path
+          ? files.find((item) => item.path === nextPath) || null
+          : webdavSession.activeFile;
+      setWebdavSession((current) => ({
+        ...current,
+        activeFile,
+      }));
+      updateStoredWebDAVSession(activeFile?.path || null, webdavSession.config);
+      excalidrawAPI?.setToast({ message: "文件已重命名" });
+    },
+    [
+      excalidrawAPI,
+      refreshWebDAVFiles,
+      setWebdavSession,
+      updateStoredWebDAVSession,
+      webdavSession.activeFile,
+      webdavSession.config,
+    ],
+  );
+
+  const handleDeleteWebDAVFile = useCallback(
+    async (file: WebDAVFileEntry) => {
+      if (!webdavSession.config) {
+        return;
+      }
+      const confirmed = await openConfirmModal({
+        title: "删除云端文件",
+        description: `确认删除 ${file.name} 吗？`,
+        actionLabel: "删除",
+        color: "danger",
+      });
+      if (!confirmed) {
+        return;
+      }
+      await deleteWebDAVFile(webdavSession.config, file.path);
+      await refreshWebDAVFiles(webdavSession.config);
+      const activeFile =
+        webdavSession.activeFile?.path === file.path
+          ? null
+          : webdavSession.activeFile;
+      setWebdavSession((current) => ({
+        ...current,
+        activeFile,
+      }));
+      updateStoredWebDAVSession(activeFile?.path || null, webdavSession.config);
+      excalidrawAPI?.setToast({ message: "文件已删除" });
+    },
+    [
+      excalidrawAPI,
+      refreshWebDAVFiles,
+      setWebdavSession,
+      updateStoredWebDAVSession,
+      webdavSession.activeFile,
+      webdavSession.config,
+    ],
+  );
+
   useEffect(() => {
-    if (!excalidrawAPI || (!isCollabDisabled && !collabAPI)) {
+    if (hasRestoredWebDAVSessionRef.current) {
+      return;
+    }
+    hasRestoredWebDAVSessionRef.current = true;
+
+    const storedConfig = importWebDAVConfigFromLocalStorage();
+    if (!storedConfig) {
+      return;
+    }
+    handleWebDAVLogin({
+      serverUrl: storedConfig.serverUrl,
+      basePath: storedConfig.basePath,
+      username: storedConfig.username,
+      password: storedConfig.password,
+    });
+  }, [handleWebDAVLogin]);
+
+  useEffect(() => {
+    if (!excalidrawAPI) {
       return;
     }
 
@@ -594,6 +1038,41 @@ const ExcalidrawWrapper = () => {
       collabAPI.syncElements(elements);
     }
 
+    const currentSerializedContent = serializeAsJSON(
+      elements,
+      appState,
+      files,
+      "local",
+    );
+
+    setWebdavSession((current) => {
+      if (ignoreNextWebDAVChangeRef.current) {
+        ignoreNextWebDAVChangeRef.current = false;
+        return current;
+      }
+
+      if (
+        !current.loggedIn ||
+        current.isSaving ||
+        current.isLoadingFile ||
+        current.error
+      ) {
+        return current;
+      }
+
+      const isDirty =
+        currentSerializedContent !== lastSyncedWebDAVContentRef.current;
+
+      if (current.remoteDirty === isDirty) {
+        return current;
+      }
+
+      return {
+        ...current,
+        remoteDirty: isDirty,
+      };
+    });
+
     // this check is redundant, but since this is a hot path, it's best
     // not to evaludate the nested expression every time
     if (!LocalData.isSavePaused()) {
@@ -627,50 +1106,6 @@ const ExcalidrawWrapper = () => {
     }
   };
 
-  const [latestShareableLink, setLatestShareableLink] = useState<string | null>(
-    null,
-  );
-
-  const onExportToBackend = async (
-    exportedElements: readonly NonDeletedExcalidrawElement[],
-    appState: Partial<AppState>,
-    files: BinaryFiles,
-  ) => {
-    if (exportedElements.length === 0) {
-      throw new Error(t("alerts.cannotExportEmptyCanvas"));
-    }
-    try {
-      const { url, errorMessage } = await exportToBackend(
-        exportedElements,
-        {
-          ...appState,
-          viewBackgroundColor: appState.exportBackground
-            ? appState.viewBackgroundColor
-            : getDefaultAppState().viewBackgroundColor,
-        },
-        files,
-      );
-
-      if (errorMessage) {
-        throw new Error(errorMessage);
-      }
-
-      if (url) {
-        setLatestShareableLink(url);
-      }
-    } catch (error: any) {
-      if (error.name !== "AbortError") {
-        const { width, height } = appState;
-        console.error(error, {
-          width,
-          height,
-          devicePixelRatio: window.devicePixelRatio,
-        });
-        throw new Error(error.message);
-      }
-    }
-  };
-
   const renderCustomStats = (
     elements: readonly NonDeletedExcalidrawElement[],
     appState: UIAppState,
@@ -683,13 +1118,6 @@ const ExcalidrawWrapper = () => {
       />
     );
   };
-
-  const isOffline = useAtomValue(isOfflineAtom);
-
-  const onCollabDialogOpen = useCallback(
-    () => setShareDialogState({ isOpen: true, type: "collaborationOnly" }),
-    [setShareDialogState],
-  );
 
   // browsers generally prevent infinite self-embedding, there are
   // cases where it still happens, and while we disallow self-embedding
@@ -710,45 +1138,6 @@ const ExcalidrawWrapper = () => {
     );
   }
 
-  const ExcalidrawPlusCommand = {
-    label: "Excalidraw+",
-    category: DEFAULT_CATEGORIES.links,
-    predicate: true,
-    icon: <div style={{ width: 14 }}>{ExcalLogo}</div>,
-    keywords: ["plus", "cloud", "server"],
-    perform: () => {
-      window.open(
-        `${
-          import.meta.env.VITE_APP_PLUS_LP
-        }/plus?utm_source=excalidraw&utm_medium=app&utm_content=command_palette`,
-        "_blank",
-      );
-    },
-  };
-  const ExcalidrawPlusAppCommand = {
-    label: "Sign up",
-    category: DEFAULT_CATEGORIES.links,
-    predicate: true,
-    icon: <div style={{ width: 14 }}>{ExcalLogo}</div>,
-    keywords: [
-      "excalidraw",
-      "plus",
-      "cloud",
-      "server",
-      "signin",
-      "login",
-      "signup",
-    ],
-    perform: () => {
-      window.open(
-        `${
-          import.meta.env.VITE_APP_PLUS_APP
-        }?utm_source=excalidraw&utm_medium=app&utm_content=command_palette`,
-        "_blank",
-      );
-    },
-  };
-
   return (
     <div
       style={{ height: "100%" }}
@@ -763,35 +1152,9 @@ const ExcalidrawWrapper = () => {
         isCollaborating={isCollaborating}
         onPointerUpdate={collabAPI?.onPointerUpdate}
         UIOptions={{
+          activeFileDirty: webdavSession.loggedIn && webdavSession.remoteDirty,
           canvasActions: {
             toggleTheme: true,
-            export: {
-              onExportToBackend,
-              renderCustomUI: excalidrawAPI
-                ? (elements, appState, files) => {
-                    return (
-                      <ExportToExcalidrawPlus
-                        elements={elements}
-                        appState={appState}
-                        files={files}
-                        name={excalidrawAPI.getName()}
-                        onError={(error) => {
-                          excalidrawAPI?.updateScene({
-                            appState: {
-                              errorMessage: error.message,
-                            },
-                          });
-                        }}
-                        onSuccess={() => {
-                          excalidrawAPI.updateScene({
-                            appState: { openDialog: null },
-                          });
-                        }}
-                      />
-                    );
-                  }
-                : undefined,
-            },
           },
         }}
         langCode={langCode}
@@ -801,52 +1164,36 @@ const ExcalidrawWrapper = () => {
         autoFocus={true}
         theme={editorTheme}
         renderTopRightUI={(isMobile) => {
-          if (isMobile || !collabAPI || isCollabDisabled) {
+          if (isMobile) {
             return null;
           }
           return (
-            <div className="top-right-ui">
-              {collabError.message && <CollabError collabError={collabError} />}
-              <LiveCollaborationTrigger
-                isCollaborating={isCollaborating}
-                onSelect={() =>
-                  setShareDialogState({ isOpen: true, type: "share" })
-                }
-              />
-            </div>
+            <WebDAVTopRight
+              loggedIn={webdavSession.loggedIn}
+              remoteDirty={webdavSession.remoteDirty}
+              isSaving={webdavSession.isSaving}
+              onLogin={() => setWebDAVLoginOpen(true)}
+              onLogout={handleWebDAVLogout}
+              onOpenManager={() => setWebDAVFileManagerOpen(true)}
+              onSave={() => saveCurrentSceneToWebDAV()}
+            />
           );
         }}
       >
         <AppMainMenu
-          onCollabDialogOpen={onCollabDialogOpen}
-          isCollaborating={isCollaborating}
-          isCollabEnabled={!isCollabDisabled}
+          loggedIn={webdavSession.loggedIn}
+          remoteDirty={webdavSession.remoteDirty}
+          onOpenLogin={() => setWebDAVLoginOpen(true)}
+          onOpenManager={() => setWebDAVFileManagerOpen(true)}
+          onSave={() => saveCurrentSceneToWebDAV()}
+          onLogout={handleWebDAVLogout}
           theme={appTheme}
           setTheme={(theme) => setAppTheme(theme)}
         />
-        <AppWelcomeScreen
-          onCollabDialogOpen={onCollabDialogOpen}
-          isCollabEnabled={!isCollabDisabled}
-        />
+        <AppWelcomeScreen onOpenLogin={() => setWebDAVLoginOpen(true)} />
         <OverwriteConfirmDialog>
           <OverwriteConfirmDialog.Actions.ExportToImage />
           <OverwriteConfirmDialog.Actions.SaveToDisk />
-          {excalidrawAPI && (
-            <OverwriteConfirmDialog.Action
-              title={t("overwriteConfirm.action.excalidrawPlus.title")}
-              actionLabel={t("overwriteConfirm.action.excalidrawPlus.button")}
-              onClick={() => {
-                exportToExcalidrawPlus(
-                  excalidrawAPI.getSceneElements(),
-                  excalidrawAPI.getAppState(),
-                  excalidrawAPI.getFiles(),
-                  excalidrawAPI.getName(),
-                );
-              }}
-            >
-              {t("overwriteConfirm.action.excalidrawPlus.description")}
-            </OverwriteConfirmDialog.Action>
-          )}
         </OverwriteConfirmDialog>
         <AppFooter />
         <TTDDialog
@@ -907,37 +1254,31 @@ const ExcalidrawWrapper = () => {
           }}
         />
         <TTDDialogTrigger />
-        {isCollaborating && isOffline && (
-          <div className="collab-offline-warning">
-            {t("alerts.collabOfflineWarning")}
-          </div>
-        )}
-        {latestShareableLink && (
-          <ShareableLinkDialog
-            link={latestShareableLink}
-            onCloseRequest={() => setLatestShareableLink(null)}
-            setErrorMessage={setErrorMessage}
-          />
-        )}
-        {excalidrawAPI && !isCollabDisabled && (
-          <Collab excalidrawAPI={excalidrawAPI} />
-        )}
 
-        <ShareDialog
-          collabAPI={collabAPI}
-          onExportToBackend={async () => {
-            if (excalidrawAPI) {
-              try {
-                await onExportToBackend(
-                  excalidrawAPI.getSceneElements(),
-                  excalidrawAPI.getAppState(),
-                  excalidrawAPI.getFiles(),
-                );
-              } catch (error: any) {
-                setErrorMessage(error.message);
-              }
-            }
+        <WebDAVLoginDialog
+          isOpen={isWebDAVLoginOpen}
+          initialConfig={webdavSession.config}
+          isConnecting={webdavSession.isConnecting}
+          error={webdavSession.error}
+          onClose={() => setWebDAVLoginOpen(false)}
+          onSubmit={handleWebDAVLogin}
+        />
+        <WebDAVFileManagerDialog
+          isOpen={isWebDAVFileManagerOpen}
+          files={webdavFiles}
+          basePath={webdavSession.config?.basePath || "/"}
+          activeFilePath={webdavSession.activeFile?.path || null}
+          isBusy={webdavSession.isLoadingFile || webdavSession.isSaving}
+          remoteDirty={webdavSession.remoteDirty}
+          onClose={() => setWebDAVFileManagerOpen(false)}
+          onLoadFile={async (file) => {
+            await loadWebDAVFile(file.path);
+            setWebDAVFileManagerOpen(false);
           }}
+          onRenameFile={handleRenameWebDAVFile}
+          onDeleteFile={handleDeleteWebDAVFile}
+          onCreateEmptyFile={handleCreateEmptyWebDAVFile}
+          onSaveCurrentAsNewFile={handleSaveCurrentAsNewWebDAVFile}
         />
 
         {errorMessage && (
@@ -949,65 +1290,38 @@ const ExcalidrawWrapper = () => {
         <CommandPalette
           customCommandPaletteItems={[
             {
-              label: t("labels.liveCollaboration"),
+              label: "在线模式",
               category: DEFAULT_CATEGORIES.app,
-              keywords: [
-                "team",
-                "multiplayer",
-                "share",
-                "public",
-                "session",
-                "invite",
-              ],
-              icon: usersIcon,
+              predicate: () => !webdavSession.loggedIn,
+              icon: loginIcon,
+              keywords: ["webdav", "remote", "cloud", "login"],
+              perform: () => setWebDAVLoginOpen(true),
+            },
+            {
+              label: webdavSession.remoteDirty ? "保存到云端 *" : "保存到云端",
+              category: DEFAULT_CATEGORIES.app,
+              predicate: () => webdavSession.loggedIn,
+              icon: ExportIcon,
+              keywords: ["webdav", "remote", "cloud", "save"],
               perform: () => {
-                setShareDialogState({
-                  isOpen: true,
-                  type: "collaborationOnly",
-                });
+                saveCurrentSceneToWebDAV();
               },
             },
             {
-              label: t("roomDialog.button_stopSession"),
+              label: "管理文件",
               category: DEFAULT_CATEGORIES.app,
-              predicate: () => !!collabAPI?.isCollaborating(),
-              keywords: [
-                "stop",
-                "session",
-                "end",
-                "leave",
-                "close",
-                "exit",
-                "collaboration",
-              ],
-              perform: () => {
-                if (collabAPI) {
-                  collabAPI.stopCollaboration();
-                  if (!collabAPI.isCollaborating()) {
-                    setShareDialogState({ isOpen: false });
-                  }
-                }
-              },
+              predicate: () => webdavSession.loggedIn,
+              icon: LibraryIcon,
+              keywords: ["webdav", "remote", "list", "files"],
+              perform: () => setWebDAVFileManagerOpen(true),
             },
             {
-              label: t("labels.share"),
+              label: "退出登陆",
               category: DEFAULT_CATEGORIES.app,
-              predicate: true,
-              icon: share,
-              keywords: [
-                "link",
-                "shareable",
-                "readonly",
-                "export",
-                "publish",
-                "snapshot",
-                "url",
-                "collaborate",
-                "invite",
-              ],
-              perform: async () => {
-                setShareDialogState({ isOpen: true, type: "share" });
-              },
+              predicate: () => webdavSession.loggedIn,
+              icon: loginIcon,
+              keywords: ["webdav", "logout", "disconnect"],
+              perform: handleWebDAVLogout,
             },
             {
               label: "GitHub",
@@ -1082,32 +1396,6 @@ const ExcalidrawWrapper = () => {
                   "_blank",
                   "noopener noreferrer",
                 );
-              },
-            },
-            ...(isExcalidrawPlusSignedUser
-              ? [
-                  {
-                    ...ExcalidrawPlusAppCommand,
-                    label: "Sign in / Go to Excalidraw+",
-                  },
-                ]
-              : [ExcalidrawPlusCommand, ExcalidrawPlusAppCommand]),
-
-            {
-              label: t("overwriteConfirm.action.excalidrawPlus.button"),
-              category: DEFAULT_CATEGORIES.export,
-              icon: exportToPlus,
-              predicate: true,
-              keywords: ["plus", "export", "save", "backup"],
-              perform: () => {
-                if (excalidrawAPI) {
-                  exportToExcalidrawPlus(
-                    excalidrawAPI.getSceneElements(),
-                    excalidrawAPI.getAppState(),
-                    excalidrawAPI.getFiles(),
-                    excalidrawAPI.getName(),
-                  );
-                }
               },
             },
             {

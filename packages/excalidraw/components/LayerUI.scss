@@ -122,12 +122,52 @@
       }
     }
 
-    &__footer {
-      width: 100%;
+    .layer-ui__header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      min-width: 0;
+      pointer-events: var(--ui-pointerEvents);
 
-      &-right {
-        z-index: 100;
+      &__project-name {
+        flex: 1;
+        min-width: 0;
         display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.125rem 0.625rem;
+        min-height: calc(var(--lg-button-size) + 0.125rem);
+        border-radius: var(--border-radius-md);
+        background: var(--input-bg-color);
+        color: var(--text-primary-color);
+        font-size: 1rem;
+        font-weight: 600;
+        line-height: 1.25;
+      }
+
+      &__project-nameLabel {
+        flex-shrink: 0;
+        opacity: 0.85;
+      }
+
+      &__project-nameValue {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      &__project-name--dirty {
+        color: #8a5d00;
+      }
+
+      &__menu {
+        display: flex;
+        align-items: center;
+        flex-shrink: 0;
+        pointer-events: var(--ui-pointerEvents);
+        position: relative;
+        z-index: 1;
       }
     }
 

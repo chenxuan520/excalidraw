@@ -202,12 +202,28 @@ const LayerUI = ({
     );
   };
 
-  const renderCanvasActions = () => (
-    <div style={{ position: "relative" }}>
-      {/* wrapping to Fragment stops React from occasionally complaining
-                about identical Keys */}
-      <tunnels.MainMenuTunnel.Out />
-      {renderWelcomeScreen && <tunnels.WelcomeScreenMenuHintTunnel.Out />}
+  const renderCanvasActions = () => <div style={{ position: "relative" }} />;
+
+  const projectName = app.getName() || "未命名";
+  const projectTitle = `正在编辑：${projectName}`;
+
+  const renderTopLeftHeader = () => (
+    <div className="layer-ui__header zen-mode-transition">
+      <div className="layer-ui__header__menu">
+        <tunnels.MainMenuTunnel.Out />
+      </div>
+      <div
+        className={clsx("layer-ui__header__project-name", {
+          "layer-ui__header__project-name--dirty": UIOptions.activeFileDirty,
+        })}
+        title={projectTitle}
+      >
+        <span className="layer-ui__header__project-nameLabel">正在编辑：</span>
+        <span className="layer-ui__header__project-nameValue">
+          {projectName}
+        </span>
+        {renderWelcomeScreen && <tunnels.WelcomeScreenMenuHintTunnel.Out />}
+      </div>
     </div>
   );
 
@@ -251,6 +267,7 @@ const LayerUI = ({
       <FixedSideContainer side="top">
         <div className="App-menu App-menu_top">
           <Stack.Col gap={6} className={clsx("App-menu_top__left")}>
+            {renderTopLeftHeader()}
             {renderCanvasActions()}
             {shouldRenderSelectedShapeActions && renderSelectedShapeActions()}
           </Stack.Col>

@@ -6,6 +6,7 @@ import {
 } from "../../packages/excalidraw/appState";
 import { clearElementsForLocalStorage } from "../../packages/excalidraw/element";
 import { STORAGE_KEYS } from "../app_constants";
+import type { WebDAVConfig, WebDAVStoredSession } from "../webdav/state";
 
 export const saveUsernameToLocalStorage = (username: string) => {
   try {
@@ -85,15 +86,76 @@ export const getElementsStorageSize = () => {
 
 export const getTotalStorageSize = () => {
   try {
-    const appState = localStorage.getItem(STORAGE_KEYS.LOCAL_STORAGE_APP_STATE);
-    const collab = localStorage.getItem(STORAGE_KEYS.LOCAL_STORAGE_COLLAB);
-
-    const appStateSize = appState?.length || 0;
-    const collabSize = collab?.length || 0;
-
-    return appStateSize + collabSize + getElementsStorageSize();
+    let total = 0;
+    for (let index = 0; index < localStorage.length; index++) {
+      const key = localStorage.key(index);
+      if (!key) {
+        continue;
+      }
+      const value = localStorage.getItem(key) || "";
+      total += key.length + value.length;
+    }
+    return total;
   } catch (error: any) {
     console.error(error);
     return 0;
+  }
+};
+
+export const saveWebDAVConfigToLocalStorage = (
+  config: WebDAVConfig,
+  activeFilePath: string | null,
+) => {
+  try {
+    const payload: WebDAVStoredSession = {
+      ...config,
+      activeFilePath,
+    };
+    localStorage.setItem(
+      STORAGE_KEYS.LOCAL_STORAGE_WEBDAV,
+      JSON.stringify(payload),
+    );
+  } catch (error: any) {
+    console.error(error);
+  }
+};
+
+export const importWebDAVConfigFromLocalStorage =
+  (): WebDAVStoredSession | null => {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.LOCAL_STORAGE_WEBDAV);
+      if (!data) {
+        return null;
+      }
+      const parsed = JSON.parse(data) as Partial<WebDAVStoredSession>;
+      if (
+        typeof parsed.serverUrl !== "string" ||
+        typeof parsed.basePath !== "string" ||
+        typeof parsed.username !== "string" ||
+        typeof parsed.password !== "string"
+      ) {
+        return null;
+      }
+      return {
+        serverUrl: parsed.serverUrl,
+        basePath: parsed.basePath,
+        username: parsed.username,
+        password: parsed.password,
+        activeFilePath:
+          typeof parsed.activeFilePath === "string"
+            ? parsed.activeFilePath
+            : null,
+      };
+    } catch (error: any) {
+      console.error(error);
+      return null;
+    }
+  };
+
+export const clearWebDAVConfigFromLocalStorage = () => {
+  try {
+    localStorage.removeItem(STORAGE_KEYS.LOCAL_STORAGE_WEBDAV);
+  } catch (error: any) {
+    console.error(error);
   }
 };

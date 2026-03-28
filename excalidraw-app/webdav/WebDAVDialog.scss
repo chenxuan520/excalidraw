@@ -1,0 +1,158 @@
+.WebDAVDialog {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+
+  &--manager {
+    max-height: min(80vh, 42rem);
+  }
+
+  &__headerMeta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  &__help,
+  &__subtitle,
+  &__metaRow {
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+  }
+
+  &__warning,
+  &__error {
+    padding: 0.75rem 1rem;
+    border-radius: var(--border-radius-md);
+    font-size: 0.875rem;
+  }
+
+  &__warning {
+    padding: 0;
+    background: transparent;
+    color: var(--color-text-warning);
+    white-space: nowrap;
+  }
+
+  &__error {
+    background: rgba(255, 0, 0, 0.08);
+    color: var(--color-danger);
+  }
+
+  &__search {
+    flex-shrink: 0;
+  }
+
+  &__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+  }
+
+  &__actions--stacked {
+    justify-content: stretch;
+    flex-wrap: wrap;
+  }
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    max-height: 26rem;
+    min-height: 0;
+    overflow: auto;
+  }
+
+  &__fileRow {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.875rem 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-md);
+    background: var(--color-surface-low);
+
+    &.is-active {
+      border-color: var(--color-primary);
+      box-shadow: inset 0 0 0 1px var(--color-primary);
+    }
+  }
+
+  &__fileMeta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 0;
+    flex: 1;
+  }
+
+  &__fileLink {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-primary);
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 600;
+    text-align: left;
+  }
+
+  &__badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    background: var(--color-primary);
+    color: var(--color-surface-lowest);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  &__rowActions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  &__footer {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--color-border);
+    flex-shrink: 0;
+  }
+
+  &__empty {
+    padding: 1rem;
+    border: 1px dashed var(--color-border);
+    border-radius: var(--border-radius-md);
+    color: var(--color-text-secondary);
+  }
+
+  &__submit-proxy {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .WebDAVDialog {
+    &__fileRow {
+      flex-direction: column;
+    }
+
+    &__rowActions,
+    &__actions {
+      width: 100%;
+      justify-content: stretch;
+      flex-direction: column;
+    }
+  }
+}

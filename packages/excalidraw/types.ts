@@ -573,6 +573,7 @@ export type CanvasActions = Partial<{
 
 export type UIOptions = Partial<{
   dockedSidebarBreakpoint: number;
+  activeFileDirty: boolean;
   canvasActions: CanvasActions;
   tools: {
     image: boolean;

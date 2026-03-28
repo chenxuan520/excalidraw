@@ -10,7 +10,6 @@ import {
   FreedrawIcon,
   FontFamilyChineseIcon,
 } from "../icons";
-import { ButtonSeparator } from "../ButtonSeparator";
 import type { FontFamilyValues } from "../../element/types";
 import { FONT_FAMILY } from "../../constants";
 import { t } from "../../i18n";
@@ -75,6 +74,11 @@ export const FontPicker = React.memo(
     onPopupChange,
   }: FontPickerProps) => {
     const defaultFonts = useMemo(() => DEFAULT_FONTS, []);
+    const primaryFonts = useMemo(
+      () => defaultFonts.slice(0, 3),
+      [defaultFonts],
+    );
+    const secondaryFonts = useMemo(() => defaultFonts.slice(3), [defaultFonts]);
     const onSelectCallback = useCallback(
       (value: number | false) => {
         if (value) {
@@ -86,27 +90,36 @@ export const FontPicker = React.memo(
 
     return (
       <div role="dialog" aria-modal="true" className="FontPicker__container">
-        <ButtonIconSelect<FontFamilyValues | false>
-          type="button"
-          options={defaultFonts}
-          value={selectedFontFamily}
-          onClick={onSelectCallback}
-        />
-        <ButtonSeparator />
-        <Popover.Root open={isOpened} onOpenChange={onPopupChange}>
-          <FontPickerTrigger selectedFontFamily={selectedFontFamily} />
-          {isOpened && (
-            <FontPickerList
-              selectedFontFamily={selectedFontFamily}
-              hoveredFontFamily={hoveredFontFamily}
-              onSelect={onSelectCallback}
-              onHover={onHover}
-              onLeave={onLeave}
-              onOpen={() => onPopupChange(true)}
-              onClose={() => onPopupChange(false)}
-            />
-          )}
-        </Popover.Root>
+        <div className="FontPicker__row FontPicker__row--primary">
+          <ButtonIconSelect<FontFamilyValues | false>
+            type="button"
+            options={primaryFonts}
+            value={selectedFontFamily}
+            onClick={onSelectCallback}
+          />
+        </div>
+        <div className="FontPicker__row FontPicker__row--secondary">
+          <ButtonIconSelect<FontFamilyValues | false>
+            type="button"
+            options={secondaryFonts}
+            value={selectedFontFamily}
+            onClick={onSelectCallback}
+          />
+          <Popover.Root open={isOpened} onOpenChange={onPopupChange}>
+            <FontPickerTrigger selectedFontFamily={selectedFontFamily} />
+            {isOpened && (
+              <FontPickerList
+                selectedFontFamily={selectedFontFamily}
+                hoveredFontFamily={hoveredFontFamily}
+                onSelect={onSelectCallback}
+                onHover={onHover}
+                onLeave={onLeave}
+                onOpen={() => onPopupChange(true)}
+                onClose={() => onPopupChange(false)}
+              />
+            )}
+          </Popover.Root>
+        </div>
       </div>
     );
   },

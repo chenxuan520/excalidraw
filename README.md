@@ -55,11 +55,28 @@
 ---
 
 # 本仓库改进点
+
 1. 支持使用中文字体
-2. 支持latex公式
-3. 支持嵌入网页所有url(原仓库只支持部分url)
+2. 支持 latex 公式
+3. 支持嵌入网页所有 url(原仓库只支持部分 url)
 4. 自动打包成前端静态文件在 release 中, 下载可直接使用
 5. 删除跟踪统计数据的部分
+
+# 编译运行方式
+
+- 编译
+
+```
+yarn install
+cd excalidraw-app
+yarn build
+```
+
+- 运行
+
+```
+yarn run start
+```
 
 ---
 

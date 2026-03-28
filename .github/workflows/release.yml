@@ -5,7 +5,7 @@ on:
       - main
       - master
     tags:
-      - 'v*'
+      - "v*"
 
 jobs:
   test:
@@ -21,7 +21,7 @@ jobs:
           yarn install
           cd excalidraw-app
           yarn build
-          
+
           tar -zcvf excalidraw-app.tar.gz ./build
           mv ./excalidraw-app.tar.gz ..
       - name: Release

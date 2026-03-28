@@ -320,7 +320,7 @@ body.excalidraw-cursor-resize * {
   }
 
   .App-menu_top {
-    grid-template-columns: 1fr 2fr 1fr;
+    grid-template-columns: minmax(0, 1fr) 2fr 1fr;
     grid-gap: 2rem;
     align-items: flex-start;
     cursor: default;
@@ -328,10 +328,11 @@ body.excalidraw-cursor-resize * {
 
     & > * {
       pointer-events: var(--ui-pointerEvents);
+      min-width: 0;
     }
 
     @media (min-width: 1536px) {
-      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-columns: minmax(0, 1fr) 1fr 1fr;
       grid-gap: 3rem;
     }
   }
@@ -647,6 +648,7 @@ body.excalidraw-cursor-resize * {
 
   .main-menu-trigger {
     @include filledButtonOnCanvas;
+    flex-shrink: 0;
   }
 
   .App-menu__left {

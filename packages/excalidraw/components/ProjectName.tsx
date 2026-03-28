@@ -1,6 +1,7 @@
 import "./TextInput.scss";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import clsx from "clsx";
 import { focusNearestParent } from "../utils";
 
 import "./ProjectName.scss";
@@ -12,11 +13,17 @@ type Props = {
   onChange: (value: string) => void;
   label: string;
   ignoreFocus?: boolean;
+  className?: string;
+  inputClassName?: string;
 };
 
 export const ProjectName = (props: Props) => {
   const { id } = useExcalidrawContainer();
   const [fileName, setFileName] = useState<string>(props.value);
+
+  useEffect(() => {
+    setFileName(props.value);
+  }, [props.value]);
 
   const handleBlur = (event: any) => {
     if (!props.ignoreFocus) {
@@ -39,13 +46,13 @@ export const ProjectName = (props: Props) => {
   };
 
   return (
-    <div className="ProjectName">
+    <div className={clsx("ProjectName", props.className)}>
       <label className="ProjectName-label" htmlFor="filename">
         {`${props.label}:`}
       </label>
       <input
         type="text"
-        className="TextInput"
+        className={clsx("TextInput", props.inputClassName)}
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
         id={`${id}-filename`}
