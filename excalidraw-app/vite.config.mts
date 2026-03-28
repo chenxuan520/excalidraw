@@ -10,7 +10,7 @@ import { woff2BrowserPlugin } from "../scripts/woff2/woff2-vite-plugins";
 // To load .env.local variables
 const envVars = loadEnv("", `../`);
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   server: {
     port: Number(envVars.VITE_APP_PORT || 3000),
     // open the browser
@@ -52,17 +52,19 @@ export default defineConfig({
   plugins: [
     woff2BrowserPlugin(),
     react(),
-    checker({
-      typescript: true,
-      eslint:
-        envVars.VITE_APP_ENABLE_ESLINT === "false"
-          ? undefined
-          : { lintCommand: 'eslint "./**/*.{js,ts,tsx}"' },
-      overlay: {
-        initialIsOpen: envVars.VITE_APP_COLLAPSE_OVERLAY === "false",
-        badgeStyle: "margin-bottom: 4rem; margin-left: 1rem",
-      },
-    }),
+    command === "serve"
+      ? checker({
+          typescript: true,
+          eslint:
+            envVars.VITE_APP_ENABLE_ESLINT === "false"
+              ? undefined
+              : { lintCommand: 'eslint "./**/*.{js,ts,tsx}"' },
+          overlay: {
+            initialIsOpen: envVars.VITE_APP_COLLAPSE_OVERLAY === "false",
+            badgeStyle: "margin-bottom: 4rem; margin-left: 1rem",
+          },
+        })
+      : null,
     svgrPlugin(),
     ViteEjsPlugin(),
     VitePWA({
@@ -205,4 +207,4 @@ export default defineConfig({
     }),
   ],
   publicDir: "../public",
-});
+}));
