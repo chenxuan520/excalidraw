@@ -521,5 +521,78 @@
     "description": "",
     "syntax": "मर्मेड संरचना नियम",
     "preview": "पूर्वावलोकन"
+  },
+  "webdav": {
+    "topRight": {
+      "onlineMode": "Online mode",
+      "saving": "Saving",
+      "save": "Save to cloud",
+      "saveDirty": "Save to cloud *",
+      "manageFiles": "Manage files",
+      "logout": "Log out"
+    },
+    "loginDialog": {
+      "title": "Sign in to online mode",
+      "serverUrl": "Server URL",
+      "serverUrlPlaceholder": "https://example.com/webdav",
+      "basePath": "Path",
+      "basePathPlaceholder": "/drawings",
+      "username": "Username",
+      "usernamePlaceholder": "username",
+      "password": "Password",
+      "passwordPlaceholder": "password",
+      "help": "Your login info is stored in this browser and online mode is restored automatically after refresh.",
+      "login": "Sign in",
+      "loggingIn": "Signing in"
+    },
+    "fileManager": {
+      "title": "Manage files",
+      "currentPath": "Current path: {{path}}",
+      "remoteDirtyWarning": "Current canvas has unsaved cloud changes.",
+      "searchLabel": "Search files",
+      "searchPlaceholder": "Type a file name for fuzzy search",
+      "empty": "There are no `.excalidraw` files in the current directory yet.",
+      "noSearchResults": "No files matched “{{query}}”.",
+      "renameLabel": "Rename",
+      "currentFile": "Current file",
+      "saveName": "Save name",
+      "overwrite": "Overwrite",
+      "rename": "Rename",
+      "newFileName": "New file name",
+      "newFilePlaceholder": "example",
+      "createEmpty": "Create empty file",
+      "saveAsNew": "Save current canvas as new file"
+    },
+    "confirm": {
+      "logoutTitle": "Exit online mode",
+      "logoutDescription": "Are you sure you want to log out? Saved WebDAV credentials will also be cleared.",
+      "logoutAction": "Log out",
+      "overwriteTitle": "Overwrite cloud file",
+      "overwriteDescription": "Overwrite {{name}} with the current canvas?",
+      "overwriteAction": "Overwrite",
+      "deleteTitle": "Delete cloud file",
+      "deleteDescription": "Delete {{name}}?"
+    },
+    "toast": {
+      "loaded": "Loaded {{name}}",
+      "loggedOut": "Exited online mode",
+      "selectFileFirst": "Please create or select a cloud file in Manage files first",
+      "saved": "Saved to cloud",
+      "created": "Created cloud file",
+      "renamed": "File renamed",
+      "deleted": "File deleted"
+    },
+    "errors": {
+      "loadFailed": "Failed to load WebDAV file",
+      "loginFailed": "WebDAV sign-in failed",
+      "saveFailed": "Failed to save WebDAV file"
+    },
+    "commandPalette": {
+      "onlineMode": "Online mode",
+      "save": "Save to cloud",
+      "saveDirty": "Save to cloud *",
+      "manageFiles": "Manage files",
+      "logout": "Log out"
+    }
   }
 }

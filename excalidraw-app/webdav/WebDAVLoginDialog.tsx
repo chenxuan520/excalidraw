@@ -3,6 +3,7 @@ import { Dialog } from "../../packages/excalidraw/components/Dialog";
 import { TextField } from "../../packages/excalidraw/components/TextField";
 import { FilledButton } from "../../packages/excalidraw/components/FilledButton";
 import { useUIAppState } from "../../packages/excalidraw/context/ui-appState";
+import { useI18n } from "../../packages/excalidraw/i18n";
 import type { WebDAVConfig } from "./state";
 
 import "./WebDAVDialog.scss";
@@ -24,6 +25,7 @@ export const WebDAVLoginDialog = ({
   onClose,
   onSubmit,
 }: WebDAVLoginDialogProps) => {
+  const { t } = useI18n();
   const openDialog = useUIAppState().openDialog;
   const [serverUrl, setServerUrl] = useState(initialConfig?.serverUrl || "");
   const [basePath, setBasePath] = useState(initialConfig?.basePath || "/");
@@ -51,45 +53,55 @@ export const WebDAVLoginDialog = ({
   }
 
   return (
-    <Dialog size="small" onCloseRequest={onClose} title="在线模式登录">
+    <Dialog
+      size="small"
+      onCloseRequest={onClose}
+      title={t("webdav.loginDialog.title")}
+    >
       <div className="WebDAVDialog">
         <TextField
-          label="服务器地址"
+          label={t("webdav.loginDialog.serverUrl")}
           value={serverUrl}
           onChange={setServerUrl}
-          placeholder="https://example.com/webdav"
+          placeholder={t("webdav.loginDialog.serverUrlPlaceholder")}
           fullWidth
         />
         <TextField
-          label="路径"
+          label={t("webdav.loginDialog.basePath")}
           value={basePath}
           onChange={setBasePath}
-          placeholder="/drawings"
+          placeholder={t("webdav.loginDialog.basePathPlaceholder")}
           fullWidth
         />
         <TextField
-          label="用户名"
+          label={t("webdav.loginDialog.username")}
           value={username}
           onChange={setUsername}
-          placeholder="username"
+          placeholder={t("webdav.loginDialog.usernamePlaceholder")}
           fullWidth
         />
         <TextField
-          label="密码"
+          label={t("webdav.loginDialog.password")}
           value={password}
           onChange={setPassword}
-          placeholder="password"
+          placeholder={t("webdav.loginDialog.passwordPlaceholder")}
           fullWidth
           isRedacted
         />
-        <div className="WebDAVDialog__help">
-          登录信息会保存在浏览器本地，并在刷新后自动恢复在线模式。
-        </div>
+        <div className="WebDAVDialog__help">{t("webdav.loginDialog.help")}</div>
         {error && <div className="WebDAVDialog__error">{error}</div>}
         <div className="WebDAVDialog__actions">
-          <FilledButton variant="outlined" label="取消" onClick={onClose} />
           <FilledButton
-            label={isConnecting ? "登录中" : "登录"}
+            variant="outlined"
+            label={t("buttons.cancel")}
+            onClick={onClose}
+          />
+          <FilledButton
+            label={
+              isConnecting
+                ? t("webdav.loginDialog.loggingIn")
+                : t("webdav.loginDialog.login")
+            }
             onClick={() => {
               if (isDisabled || isConnecting) {
                 return;

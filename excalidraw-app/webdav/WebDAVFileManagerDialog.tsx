@@ -8,6 +8,7 @@ import {
   save,
 } from "../../packages/excalidraw/components/icons";
 import { useUIAppState } from "../../packages/excalidraw/context/ui-appState";
+import { useI18n } from "../../packages/excalidraw/i18n";
 import type { WebDAVFileEntry } from "./state";
 
 import "./WebDAVDialog.scss";
@@ -75,6 +76,7 @@ export const WebDAVFileManagerDialog = ({
   onCreateEmptyFile,
   onSaveCurrentAsNewFile,
 }: WebDAVFileManagerDialogProps) => {
+  const { t } = useI18n();
   const openDialog = useUIAppState().openDialog;
   const [createName, setCreateName] = useState("");
   const [renamePath, setRenamePath] = useState<string | null>(null);
@@ -125,35 +127,39 @@ export const WebDAVFileManagerDialog = ({
   }
 
   return (
-    <Dialog size="regular" onCloseRequest={onClose} title="管理文件">
+    <Dialog
+      size="regular"
+      onCloseRequest={onClose}
+      title={t("webdav.fileManager.title")}
+    >
       <div className="WebDAVDialog WebDAVDialog--manager">
         <div className="WebDAVDialog__headerMeta">
           <div className="WebDAVDialog__subtitle">
-            当前路径：{basePath || "/"}
+            {t("webdav.fileManager.currentPath", { path: basePath || "/" })}
           </div>
           {remoteDirty && (
             <div className="WebDAVDialog__warning">
-              当前画布有未保存到云端的改动。
+              {t("webdav.fileManager.remoteDirtyWarning")}
             </div>
           )}
         </div>
         <div className="WebDAVDialog__search">
           <TextField
-            label="搜索文件"
+            label={t("webdav.fileManager.searchLabel")}
             value={searchQuery}
             onChange={setSearchQuery}
-            placeholder="输入文件名，支持模糊搜索"
+            placeholder={t("webdav.fileManager.searchPlaceholder")}
             fullWidth
           />
         </div>
         <div className="WebDAVDialog__list">
           {emptyState ? (
             <div className="WebDAVDialog__empty">
-              当前目录还没有 `.excalidraw` 文件。
+              {t("webdav.fileManager.empty")}
             </div>
           ) : showNoSearchResults ? (
             <div className="WebDAVDialog__empty">
-              没找到匹配 “{searchQuery}” 的文件。
+              {t("webdav.fileManager.noSearchResults", { query: searchQuery })}
             </div>
           ) : (
             filteredFiles.map((file) => {
@@ -169,7 +175,7 @@ export const WebDAVFileManagerDialog = ({
                   <div className="WebDAVDialog__fileMeta">
                     {isRenaming ? (
                       <TextField
-                        label="重命名"
+                        label={t("webdav.fileManager.renameLabel")}
                         value={renameName}
                         onChange={setRenameName}
                         fullWidth
@@ -183,7 +189,9 @@ export const WebDAVFileManagerDialog = ({
                       >
                         <span>{file.name}</span>
                         {isActive && (
-                          <span className="WebDAVDialog__badge">当前文件</span>
+                          <span className="WebDAVDialog__badge">
+                            {t("webdav.fileManager.currentFile")}
+                          </span>
                         )}
                       </button>
                     )}
@@ -200,7 +208,7 @@ export const WebDAVFileManagerDialog = ({
                         <FilledButton
                           size="medium"
                           variant="outlined"
-                          label="取消"
+                          label={t("buttons.cancel")}
                           onClick={() => {
                             setRenamePath(null);
                             setRenameName("");
@@ -208,7 +216,7 @@ export const WebDAVFileManagerDialog = ({
                         />
                         <FilledButton
                           size="medium"
-                          label="保存名称"
+                          label={t("webdav.fileManager.saveName")}
                           onClick={() => onRenameFile(file, renameName)}
                         />
                       </>
@@ -217,14 +225,14 @@ export const WebDAVFileManagerDialog = ({
                         <FilledButton
                           size="medium"
                           variant="outlined"
-                          label="覆盖"
+                          label={t("webdav.fileManager.overwrite")}
                           icon={save}
                           onClick={() => onOverwriteCurrentToFile(file)}
                         />
                         <FilledButton
                           size="medium"
                           variant="outlined"
-                          label="重命名"
+                          label={t("webdav.fileManager.rename")}
                           icon={DuplicateIcon}
                           onClick={() => {
                             setRenamePath(file.path);
@@ -237,7 +245,7 @@ export const WebDAVFileManagerDialog = ({
                           size="medium"
                           variant="outlined"
                           color="danger"
-                          label="删除"
+                          label={t("labels.delete")}
                           icon={TrashIcon}
                           onClick={() => onDeleteFile(file)}
                         />
@@ -251,20 +259,20 @@ export const WebDAVFileManagerDialog = ({
         </div>
         <div className="WebDAVDialog__footer">
           <TextField
-            label="新文件名"
+            label={t("webdav.fileManager.newFileName")}
             value={createName}
             onChange={setCreateName}
-            placeholder="example"
+            placeholder={t("webdav.fileManager.newFilePlaceholder")}
             fullWidth
           />
           <div className="WebDAVDialog__actions WebDAVDialog__actions--stacked">
             <FilledButton
               variant="outlined"
-              label="新建空白文件"
+              label={t("webdav.fileManager.createEmpty")}
               onClick={() => onCreateEmptyFile(createName)}
             />
             <FilledButton
-              label="将当前画布另存为新文件"
+              label={t("webdav.fileManager.saveAsNew")}
               onClick={() => onSaveCurrentAsNewFile(createName)}
             />
           </div>

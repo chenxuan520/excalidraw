@@ -515,6 +515,79 @@
       }
     }
   },
+  "webdav": {
+    "topRight": {
+      "onlineMode": "在线模式",
+      "saving": "保存中",
+      "save": "保存到云端",
+      "saveDirty": "保存到云端 *",
+      "manageFiles": "管理文件",
+      "logout": "退出登录"
+    },
+    "loginDialog": {
+      "title": "在线模式登录",
+      "serverUrl": "服务器地址",
+      "serverUrlPlaceholder": "https://example.com/webdav",
+      "basePath": "路径",
+      "basePathPlaceholder": "/drawings",
+      "username": "用户名",
+      "usernamePlaceholder": "username",
+      "password": "密码",
+      "passwordPlaceholder": "password",
+      "help": "登录信息会保存在浏览器本地，并在刷新后自动恢复在线模式。",
+      "login": "登录",
+      "loggingIn": "登录中"
+    },
+    "fileManager": {
+      "title": "管理文件",
+      "currentPath": "当前路径：{{path}}",
+      "remoteDirtyWarning": "当前画布有未保存到云端的改动。",
+      "searchLabel": "搜索文件",
+      "searchPlaceholder": "输入文件名，支持模糊搜索",
+      "empty": "当前目录还没有 `.excalidraw` 文件。",
+      "noSearchResults": "没找到匹配“{{query}}”的文件。",
+      "renameLabel": "重命名",
+      "currentFile": "当前文件",
+      "saveName": "保存名称",
+      "overwrite": "覆盖",
+      "rename": "重命名",
+      "newFileName": "新文件名",
+      "newFilePlaceholder": "example",
+      "createEmpty": "新建空白文件",
+      "saveAsNew": "将当前画布另存为新文件"
+    },
+    "confirm": {
+      "logoutTitle": "退出在线模式",
+      "logoutDescription": "确认退出登录吗？已保存的 WebDAV 登录信息也会一并清除。",
+      "logoutAction": "退出登录",
+      "overwriteTitle": "覆盖云端文件",
+      "overwriteDescription": "确认用当前画布覆盖 {{name}} 吗？",
+      "overwriteAction": "覆盖保存",
+      "deleteTitle": "删除云端文件",
+      "deleteDescription": "确认删除 {{name}} 吗？"
+    },
+    "toast": {
+      "loaded": "已加载 {{name}}",
+      "loggedOut": "已退出在线模式",
+      "selectFileFirst": "请先在管理文件中创建或选择一个云端文件",
+      "saved": "已保存到云端",
+      "created": "已创建云端文件",
+      "renamed": "文件已重命名",
+      "deleted": "文件已删除"
+    },
+    "errors": {
+      "loadFailed": "加载 WebDAV 文件失败",
+      "loginFailed": "WebDAV 登录失败",
+      "saveFailed": "保存 WebDAV 文件失败"
+    },
+    "commandPalette": {
+      "onlineMode": "在线模式",
+      "save": "保存到云端",
+      "saveDirty": "保存到云端 *",
+      "manageFiles": "管理文件",
+      "logout": "退出登录"
+    }
+  },
   "mermaid": {
     "title": "Mermaid 至 Excalidraw",
     "button": "插入",

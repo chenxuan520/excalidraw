@@ -484,12 +484,14 @@ const ExcalidrawWrapper = () => {
           storeAction: StoreAction.UPDATE,
         });
         updateStoredWebDAVSession(path);
-        excalidrawAPI.setToast({ message: `已加载 ${activeFile.name}` });
+        excalidrawAPI.setToast({
+          message: t("webdav.toast.loaded", { name: activeFile.name }),
+        });
       } catch (error: any) {
         setWebdavSession((current) => ({
           ...current,
           isLoadingFile: false,
-          error: error.message || "加载 WebDAV 文件失败",
+          error: error.message || t("webdav.errors.loadFailed"),
         }));
         throw error;
       } finally {
@@ -551,7 +553,7 @@ const ExcalidrawWrapper = () => {
         setWebdavSession((current) => ({
           ...current,
           isConnecting: false,
-          error: error.message || "WebDAV 登录失败",
+          error: error.message || t("webdav.errors.loginFailed"),
         }));
       }
     },
@@ -566,9 +568,9 @@ const ExcalidrawWrapper = () => {
 
   const handleWebDAVLogout = useCallback(async () => {
     const confirmed = await openConfirmModal({
-      title: "退出在线模式",
-      description: "确认退出登录吗？已保存的 WebDAV 登录信息也会一并清除。",
-      actionLabel: "退出登录",
+      title: t("webdav.confirm.logoutTitle"),
+      description: t("webdav.confirm.logoutDescription"),
+      actionLabel: t("webdav.confirm.logoutAction"),
       color: "danger",
     });
 
@@ -587,7 +589,7 @@ const ExcalidrawWrapper = () => {
       },
       storeAction: StoreAction.UPDATE,
     });
-    excalidrawAPI?.setToast({ message: "已退出在线模式" });
+    excalidrawAPI?.setToast({ message: t("webdav.toast.loggedOut") });
   }, [
     excalidrawAPI,
     setWebDAVFileManagerOpen,
@@ -605,7 +607,7 @@ const ExcalidrawWrapper = () => {
       if (!resolvedPath) {
         setWebDAVFileManagerOpen(true);
         excalidrawAPI.setToast({
-          message: "请先在管理文件中创建或选择一个云端文件",
+          message: t("webdav.toast.selectFileFirst"),
         });
         return;
       }
@@ -647,13 +649,16 @@ const ExcalidrawWrapper = () => {
         updateStoredWebDAVSession(resolvedPath, webdavSession.config);
         ignoreNextWebDAVChangeRef.current = true;
         window.setTimeout(() => {
-          excalidrawAPI.setToast({ message: "已保存到云端", duration: 1500 });
+          excalidrawAPI.setToast({
+            message: t("webdav.toast.saved"),
+            duration: 1500,
+          });
         }, 0);
       } catch (error: any) {
         setWebdavSession((current) => ({
           ...current,
           isSaving: false,
-          error: error.message || "保存 WebDAV 文件失败",
+          error: error.message || t("webdav.errors.saveFailed"),
         }));
       }
     },
@@ -674,13 +679,16 @@ const ExcalidrawWrapper = () => {
         return;
       }
 
-      const isOverwritingDifferentFile = file.path !== webdavSession.activeFile?.path;
+      const isOverwritingDifferentFile =
+        file.path !== webdavSession.activeFile?.path;
       if (
         isOverwritingDifferentFile &&
         !(await openConfirmModal({
-          title: "覆盖云端文件",
-          description: `确认用当前画布覆盖 ${file.name} 吗？`,
-          actionLabel: "覆盖保存",
+          title: t("webdav.confirm.overwriteTitle"),
+          description: t("webdav.confirm.overwriteDescription", {
+            name: file.name,
+          }),
+          actionLabel: t("webdav.confirm.overwriteAction"),
           color: "danger",
         }))
       ) {
@@ -751,7 +759,7 @@ const ExcalidrawWrapper = () => {
         remoteDirty: false,
       }));
       updateStoredWebDAVSession(remotePath, webdavSession.config);
-      excalidrawAPI.setToast({ message: "已创建云端文件" });
+      excalidrawAPI.setToast({ message: t("webdav.toast.created") });
     },
     [
       excalidrawAPI,
@@ -782,7 +790,7 @@ const ExcalidrawWrapper = () => {
         activeFile,
       }));
       updateStoredWebDAVSession(activeFile?.path || null, webdavSession.config);
-      excalidrawAPI?.setToast({ message: "文件已重命名" });
+      excalidrawAPI?.setToast({ message: t("webdav.toast.renamed") });
     },
     [
       excalidrawAPI,
@@ -800,9 +808,11 @@ const ExcalidrawWrapper = () => {
         return;
       }
       const confirmed = await openConfirmModal({
-        title: "删除云端文件",
-        description: `确认删除 ${file.name} 吗？`,
-        actionLabel: "删除",
+        title: t("webdav.confirm.deleteTitle"),
+        description: t("webdav.confirm.deleteDescription", {
+          name: file.name,
+        }),
+        actionLabel: t("labels.delete"),
         color: "danger",
       });
       if (!confirmed) {
@@ -819,7 +829,7 @@ const ExcalidrawWrapper = () => {
         activeFile,
       }));
       updateStoredWebDAVSession(activeFile?.path || null, webdavSession.config);
-      excalidrawAPI?.setToast({ message: "文件已删除" });
+      excalidrawAPI?.setToast({ message: t("webdav.toast.deleted") });
     },
     [
       excalidrawAPI,
@@ -1331,7 +1341,7 @@ const ExcalidrawWrapper = () => {
         <CommandPalette
           customCommandPaletteItems={[
             {
-              label: "在线模式",
+              label: t("webdav.commandPalette.onlineMode"),
               category: DEFAULT_CATEGORIES.app,
               predicate: () => !webdavSession.loggedIn,
               icon: loginIcon,
@@ -1339,7 +1349,9 @@ const ExcalidrawWrapper = () => {
               perform: () => setWebDAVLoginOpen(true),
             },
             {
-              label: webdavSession.remoteDirty ? "保存到云端 *" : "保存到云端",
+              label: webdavSession.remoteDirty
+                ? t("webdav.commandPalette.saveDirty")
+                : t("webdav.commandPalette.save"),
               category: DEFAULT_CATEGORIES.app,
               predicate: () => webdavSession.loggedIn,
               icon: ExportIcon,
@@ -1349,7 +1361,7 @@ const ExcalidrawWrapper = () => {
               },
             },
             {
-              label: "管理文件",
+              label: t("webdav.commandPalette.manageFiles"),
               category: DEFAULT_CATEGORIES.app,
               predicate: () => webdavSession.loggedIn,
               icon: LibraryIcon,
@@ -1357,7 +1369,7 @@ const ExcalidrawWrapper = () => {
               perform: () => setWebDAVFileManagerOpen(true),
             },
             {
-              label: "退出登陆",
+              label: t("webdav.commandPalette.logout"),
               category: DEFAULT_CATEGORIES.app,
               predicate: () => webdavSession.loggedIn,
               icon: loginIcon,
