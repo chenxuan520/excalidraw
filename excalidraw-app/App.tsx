@@ -97,6 +97,7 @@ import {
   CommandPalette,
   DEFAULT_CATEGORIES,
 } from "../packages/excalidraw/components/CommandPalette/CommandPalette";
+import Trans from "../packages/excalidraw/components/Trans";
 import {
   GithubIcon,
   XBrandIcon,
@@ -182,6 +183,14 @@ if (window.self !== window.top) {
   }
 }
 
+const renderExternalSceneOverwriteDescription = () => (
+  <Trans
+    i18nKey="overwriteConfirm.modal.shareableLink.description"
+    bold={(text) => <strong>{text}</strong>}
+    br={() => <br />}
+  />
+);
+
 const initializeScene = async (opts: {
   collabAPI: CollabAPI | null;
   excalidrawAPI: ExcalidrawImperativeAPI;
@@ -215,7 +224,7 @@ const initializeScene = async (opts: {
       // otherwise, prompt whether user wants to override current scene
       (await openConfirmModal({
         title: t("overwriteConfirm.modal.shareableLink.title"),
-        description: t("overwriteConfirm.modal.shareableLink.description"),
+        description: renderExternalSceneOverwriteDescription(),
         actionLabel: t("overwriteConfirm.modal.shareableLink.button"),
         color: "danger",
       }))
@@ -259,7 +268,7 @@ const initializeScene = async (opts: {
         !scene.elements.length ||
         (await openConfirmModal({
           title: t("overwriteConfirm.modal.shareableLink.title"),
-          description: t("overwriteConfirm.modal.shareableLink.description"),
+          description: renderExternalSceneOverwriteDescription(),
           actionLabel: t("overwriteConfirm.modal.shareableLink.button"),
           color: "danger",
         }))
@@ -415,7 +424,7 @@ const ExcalidrawWrapper = () => {
         (existingElements.length > 0 || webdavSession.remoteDirty) &&
         !(await openConfirmModal({
           title: t("overwriteConfirm.modal.shareableLink.title"),
-          description: t("overwriteConfirm.modal.shareableLink.description"),
+          description: renderExternalSceneOverwriteDescription(),
           actionLabel: t("overwriteConfirm.modal.shareableLink.button"),
           color: "danger",
         }))
@@ -654,6 +663,37 @@ const ExcalidrawWrapper = () => {
       setWebDAVFileManagerOpen,
       setWebdavSession,
       updateStoredWebDAVSession,
+      webdavSession.activeFile,
+      webdavSession.config,
+    ],
+  );
+
+  const handleOverwriteCurrentToWebDAVFile = useCallback(
+    async (file: WebDAVFileEntry) => {
+      if (!excalidrawAPI || !webdavSession.config) {
+        return;
+      }
+
+      const isOverwritingDifferentFile = file.path !== webdavSession.activeFile?.path;
+      if (
+        isOverwritingDifferentFile &&
+        !(await openConfirmModal({
+          title: "覆盖云端文件",
+          description: `确认用当前画布覆盖 ${file.name} 吗？`,
+          actionLabel: "覆盖保存",
+          color: "danger",
+        }))
+      ) {
+        return;
+      }
+
+      await saveCurrentSceneToWebDAV(file.path);
+      setWebDAVFileManagerOpen(false);
+    },
+    [
+      excalidrawAPI,
+      saveCurrentSceneToWebDAV,
+      setWebDAVFileManagerOpen,
       webdavSession.activeFile,
       webdavSession.config,
     ],
@@ -1277,6 +1317,7 @@ const ExcalidrawWrapper = () => {
           }}
           onRenameFile={handleRenameWebDAVFile}
           onDeleteFile={handleDeleteWebDAVFile}
+          onOverwriteCurrentToFile={handleOverwriteCurrentToWebDAVFile}
           onCreateEmptyFile={handleCreateEmptyWebDAVFile}
           onSaveCurrentAsNewFile={handleSaveCurrentAsNewWebDAVFile}
         />

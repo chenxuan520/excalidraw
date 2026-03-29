@@ -5,6 +5,7 @@ import { TextField } from "../../packages/excalidraw/components/TextField";
 import {
   DuplicateIcon,
   TrashIcon,
+  save,
 } from "../../packages/excalidraw/components/icons";
 import { useUIAppState } from "../../packages/excalidraw/context/ui-appState";
 import type { WebDAVFileEntry } from "./state";
@@ -54,6 +55,7 @@ type WebDAVFileManagerDialogProps = {
   onLoadFile: (file: WebDAVFileEntry) => Promise<void> | void;
   onRenameFile: (file: WebDAVFileEntry, name: string) => Promise<void> | void;
   onDeleteFile: (file: WebDAVFileEntry) => Promise<void> | void;
+  onOverwriteCurrentToFile: (file: WebDAVFileEntry) => Promise<void> | void;
   onCreateEmptyFile: (name: string) => Promise<void> | void;
   onSaveCurrentAsNewFile: (name: string) => Promise<void> | void;
 };
@@ -69,6 +71,7 @@ export const WebDAVFileManagerDialog = ({
   onLoadFile,
   onRenameFile,
   onDeleteFile,
+  onOverwriteCurrentToFile,
   onCreateEmptyFile,
   onSaveCurrentAsNewFile,
 }: WebDAVFileManagerDialogProps) => {
@@ -211,6 +214,13 @@ export const WebDAVFileManagerDialog = ({
                       </>
                     ) : (
                       <>
+                        <FilledButton
+                          size="medium"
+                          variant="outlined"
+                          label="覆盖"
+                          icon={save}
+                          onClick={() => onOverwriteCurrentToFile(file)}
+                        />
                         <FilledButton
                           size="medium"
                           variant="outlined"
