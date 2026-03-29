@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import type { ActionManager } from "../actions/manager";
 import type {
   ExcalidrawElement,
@@ -21,7 +21,7 @@ import type { AppClassProperties, AppProps, UIAppState, Zoom } from "../types";
 import { capitalizeString, isTransparent } from "../utils";
 import Stack from "./Stack";
 import { ToolButton } from "./ToolButton";
-import { SubtypeShapeActions } from "./Subtypes";
+import { SubtypeShapeActions, SubtypeToggles } from "./Subtypes";
 import { hasStrokeColor } from "../scene/comparisons";
 import { trackEvent } from "../analytics";
 import {
@@ -282,7 +282,7 @@ export const ShapesSwitcher = ({
         const shortcut = letter
           ? `${letter} ${t("helpDialog.or")} ${numericKey}`
           : `${numericKey}`;
-        return (
+        const button = (
           <ToolButton
             className={clsx("Shape", { fillable })}
             key={value}
@@ -315,6 +315,17 @@ export const ShapesSwitcher = ({
             }}
           />
         );
+
+        if (value === "eraser") {
+          return (
+            <Fragment key={value}>
+              {button}
+              <SubtypeToggles insideToolbar />
+            </Fragment>
+          );
+        }
+
+        return button;
       })}
       <div className="App-toolbar__divider" />
 

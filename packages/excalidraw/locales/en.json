@@ -606,6 +606,7 @@
     "fileManager": {
       "title": "Manage files",
       "currentPath": "Current path: {{path}}",
+      "serverUrl": "Server: {{url}}",
       "remoteDirtyWarning": "Current canvas has unsaved cloud changes.",
       "searchLabel": "Search files",
       "searchPlaceholder": "Type a file name for fuzzy search",

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Dialog } from "../../packages/excalidraw/components/Dialog";
 import { FilledButton } from "../../packages/excalidraw/components/FilledButton";
 import { TextField } from "../../packages/excalidraw/components/TextField";
@@ -49,7 +49,9 @@ type WebDAVFileManagerDialogProps = {
   isOpen: boolean;
   files: WebDAVFileEntry[];
   basePath: string;
+  serverUrl: string;
   activeFilePath: string | null;
+  defaultCreateName: string;
   isBusy: boolean;
   remoteDirty: boolean;
   onClose: () => void;
@@ -65,7 +67,9 @@ export const WebDAVFileManagerDialog = ({
   isOpen,
   files,
   basePath,
+  serverUrl,
   activeFilePath,
+  defaultCreateName,
   isBusy,
   remoteDirty,
   onClose,
@@ -82,6 +86,7 @@ export const WebDAVFileManagerDialog = ({
   const [renamePath, setRenamePath] = useState<string | null>(null);
   const [renameName, setRenameName] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const wasOpenRef = useRef(false);
 
   useEffect(() => {
     if (isOpen && openDialog) {
@@ -90,13 +95,19 @@ export const WebDAVFileManagerDialog = ({
   }, [isOpen, onClose, openDialog]);
 
   useEffect(() => {
+    if (isOpen && !wasOpenRef.current) {
+      setCreateName(defaultCreateName);
+    }
+
     if (!isOpen) {
       setCreateName("");
       setRenamePath(null);
       setRenameName("");
       setSearchQuery("");
     }
-  }, [isOpen]);
+
+    wasOpenRef.current = isOpen;
+  }, [defaultCreateName, isOpen]);
 
   const filteredFiles = useMemo(() => {
     const normalizedQuery = searchQuery.trim();
@@ -134,8 +145,13 @@ export const WebDAVFileManagerDialog = ({
     >
       <div className="WebDAVDialog WebDAVDialog--manager">
         <div className="WebDAVDialog__headerMeta">
-          <div className="WebDAVDialog__subtitle">
-            {t("webdav.fileManager.currentPath", { path: basePath || "/" })}
+          <div className="WebDAVDialog__headerInfo">
+            <div className="WebDAVDialog__subtitle">
+              {t("webdav.fileManager.currentPath", { path: basePath || "/" })}
+            </div>
+            <div className="WebDAVDialog__subtitle">
+              {t("webdav.fileManager.serverUrl", { url: serverUrl })}
+            </div>
           </div>
           {remoteDirty && (
             <div className="WebDAVDialog__warning">

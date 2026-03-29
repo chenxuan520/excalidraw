@@ -191,6 +191,10 @@ const renderExternalSceneOverwriteDescription = () => (
   />
 );
 
+const getCurrentSceneName = (excalidrawAPI: ExcalidrawImperativeAPI | null) => {
+  return (excalidrawAPI?.getAppState().name || "").replace(/\.excalidraw$/, "");
+};
+
 const initializeScene = async (opts: {
   collabAPI: CollabAPI | null;
   excalidrawAPI: ExcalidrawImperativeAPI;
@@ -466,6 +470,7 @@ const ExcalidrawWrapper = () => {
           ...current,
           activeFile,
           remoteDirty: false,
+          isCurrentSceneWebDAV: true,
           isLoadingFile: false,
         }));
         lastSyncedWebDAVContentRef.current = serializeAsJSON(
@@ -535,6 +540,7 @@ const ExcalidrawWrapper = () => {
           loggedIn: true,
           config: normalizedConfig,
           activeFile: nextActiveFile,
+          isCurrentSceneWebDAV: nextActiveFile !== null,
           isConnecting: false,
           isSaving: false,
           isLoadingFile: false,
@@ -641,6 +647,7 @@ const ExcalidrawWrapper = () => {
         setWebdavSession((current) => ({
           ...current,
           activeFile: activeFile || null,
+          isCurrentSceneWebDAV: true,
           isSaving: false,
           remoteDirty: false,
           error: null,
@@ -756,6 +763,7 @@ const ExcalidrawWrapper = () => {
       setWebdavSession((current) => ({
         ...current,
         activeFile,
+        isCurrentSceneWebDAV: true,
         remoteDirty: false,
       }));
       updateStoredWebDAVSession(remotePath, webdavSession.config);
@@ -788,6 +796,7 @@ const ExcalidrawWrapper = () => {
       setWebdavSession((current) => ({
         ...current,
         activeFile,
+        isCurrentSceneWebDAV: activeFile !== null,
       }));
       updateStoredWebDAVSession(activeFile?.path || null, webdavSession.config);
       excalidrawAPI?.setToast({ message: t("webdav.toast.renamed") });
@@ -827,6 +836,7 @@ const ExcalidrawWrapper = () => {
       setWebdavSession((current) => ({
         ...current,
         activeFile,
+        isCurrentSceneWebDAV: activeFile !== null,
       }));
       updateStoredWebDAVSession(activeFile?.path || null, webdavSession.config);
       excalidrawAPI?.setToast({ message: t("webdav.toast.deleted") });
@@ -1188,6 +1198,10 @@ const ExcalidrawWrapper = () => {
     );
   }
 
+  const currentLocalSceneName = webdavSession.isCurrentSceneWebDAV
+    ? ""
+    : getCurrentSceneName(excalidrawAPI);
+
   return (
     <div
       style={{ height: "100%" }}
@@ -1197,12 +1211,14 @@ const ExcalidrawWrapper = () => {
     >
       <Excalidraw
         excalidrawAPI={excalidrawRefCallback}
+        aiEnabled={false}
         onChange={onChange}
         initialData={initialStatePromiseRef.current.promise}
         isCollaborating={isCollaborating}
         onPointerUpdate={collabAPI?.onPointerUpdate}
         UIOptions={{
           activeFileDirty: webdavSession.loggedIn && webdavSession.remoteDirty,
+          isLocalFile: !webdavSession.isCurrentSceneWebDAV,
           canvasActions: {
             toggleTheme: true,
           },
@@ -1317,7 +1333,9 @@ const ExcalidrawWrapper = () => {
           isOpen={isWebDAVFileManagerOpen}
           files={webdavFiles}
           basePath={webdavSession.config?.basePath || "/"}
+          serverUrl={webdavSession.config?.serverUrl || ""}
           activeFilePath={webdavSession.activeFile?.path || null}
+          defaultCreateName={currentLocalSceneName}
           isBusy={webdavSession.isLoadingFile || webdavSession.isSaving}
           remoteDirty={webdavSession.remoteDirty}
           onClose={() => setWebDAVFileManagerOpen(false)}
@@ -1392,46 +1410,7 @@ const ExcalidrawWrapper = () => {
               ],
               perform: () => {
                 window.open(
-                  "https://github.com/excalidraw/excalidraw",
-                  "_blank",
-                  "noopener noreferrer",
-                );
-              },
-            },
-            {
-              label: t("labels.followUs"),
-              icon: XBrandIcon,
-              category: DEFAULT_CATEGORIES.links,
-              predicate: true,
-              keywords: ["twitter", "contact", "social", "community"],
-              perform: () => {
-                window.open(
-                  "https://x.com/excalidraw",
-                  "_blank",
-                  "noopener noreferrer",
-                );
-              },
-            },
-            {
-              label: t("labels.discordChat"),
-              category: DEFAULT_CATEGORIES.links,
-              predicate: true,
-              icon: DiscordIcon,
-              keywords: [
-                "chat",
-                "talk",
-                "contact",
-                "bugs",
-                "requests",
-                "report",
-                "feedback",
-                "suggestions",
-                "social",
-                "community",
-              ],
-              perform: () => {
-                window.open(
-                  "https://discord.gg/UexuTaE",
+                  "https://github.com/chenxuan520/excalidraw",
                   "_blank",
                   "noopener noreferrer",
                 );

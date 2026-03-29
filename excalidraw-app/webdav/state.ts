@@ -24,6 +24,7 @@ export type WebDAVSessionState = {
   loggedIn: boolean;
   config: WebDAVConfig | null;
   activeFile: WebDAVFileEntry | null;
+  isCurrentSceneWebDAV: boolean;
   isConnecting: boolean;
   isSaving: boolean;
   isLoadingFile: boolean;
@@ -35,6 +36,7 @@ export const initialWebDAVSessionState: WebDAVSessionState = {
   loggedIn: false,
   config: null,
   activeFile: null,
+  isCurrentSceneWebDAV: false,
   isConnecting: false,
   isSaving: false,
   isLoadingFile: false,

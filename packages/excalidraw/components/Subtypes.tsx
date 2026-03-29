@@ -26,9 +26,12 @@ export const SubtypeButton = (
   icon: ({ theme }: { theme: Theme }) => JSX.Element,
   key?: string,
 ) => {
-  const title = key !== undefined ? ` - ${getShortcutKey(key)}` : "";
+  const shortcutLabel = key !== undefined ? getShortcutKey(key) : undefined;
+  const title = shortcutLabel !== undefined ? ` - ${shortcutLabel}` : "";
   const keyTest: Action["keyTest"] =
-    key !== undefined ? (event) => event.code === `Key${key}` : undefined;
+    key !== undefined
+      ? (event) => event.key.toLowerCase() === key.toLowerCase()
+      : undefined;
   const subtypeAction: Action = {
     name: makeCustomActionName(subtype),
     label: t(`toolBar.${subtype}`),
@@ -86,6 +89,7 @@ export const SubtypeButton = (
         })}
         title={`${t(`toolBar.${subtype}`)}${title}`}
         aria-label={t(`toolBar.${subtype}`)}
+        aria-keyshortcuts={key}
         onClick={() => {
           updateData(null);
         }}
@@ -107,6 +111,9 @@ export const SubtypeButton = (
         {
           <div className="ToolIcon__icon" aria-hidden="true">
             {icon.call(this, { theme: appState.theme })}
+            {shortcutLabel && (
+              <span className="ToolIcon__keybinding">{shortcutLabel}</span>
+            )}
           </div>
         }
       </button>
@@ -118,7 +125,11 @@ export const SubtypeButton = (
   return subtypeAction;
 };
 
-export const SubtypeToggles = () => {
+export const SubtypeToggles = ({
+  insideToolbar = false,
+}: {
+  insideToolbar?: boolean;
+}) => {
   const am = useExcalidrawActionManager();
   const { container } = useExcalidrawContainer();
   const setAppState = useExcalidrawSetAppState();
@@ -150,6 +161,17 @@ export const SubtypeToggles = () => {
   if (getSubtypeNames().length === 0) {
     return <></>;
   }
+  const toggles = getSubtypeNames().map((subtype) =>
+    am.renderAction(
+      makeCustomActionName(subtype),
+      hasAlwaysEnabledActions(subtype) ? { onContextMenu } : {},
+    ),
+  );
+
+  if (insideToolbar) {
+    return <>{toggles}</>;
+  }
+
   return (
     <>
       <Island
@@ -159,12 +181,7 @@ export const SubtypeToggles = () => {
           height: "fit-content",
         }}
       >
-        {getSubtypeNames().map((subtype) =>
-          am.renderAction(
-            makeCustomActionName(subtype),
-            hasAlwaysEnabledActions(subtype) ? { onContextMenu } : {},
-          ),
-        )}
+        {toggles}
       </Island>
     </>
   );

@@ -1630,7 +1630,7 @@ const createMathActions = () => {
       enableActionChangeMathProps(rest[0], rest[1], rest[3]),
     trackEvent: false,
   };
-  const actionMath = SubtypeButton(mathSubtype, "text", mathSubtypeIcon, "M");
+  const actionMath = SubtypeButton(mathSubtype, "text", mathSubtypeIcon, "-");
   mathActions.push(actionUseTexTrue);
   mathActions.push(actionUseTexFalse);
   mathActions.push(actionResetUseTex);

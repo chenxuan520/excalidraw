@@ -205,7 +205,8 @@ const LayerUI = ({
   const renderCanvasActions = () => <div style={{ position: "relative" }} />;
 
   const projectName = app.getName() || "未命名";
-  const projectTitle = `正在编辑：${projectName}`;
+  const projectLabel = UIOptions.isLocalFile ? "本地文件:" : "正在编辑：";
+  const projectTitle = `${projectLabel}${projectName}`;
 
   const renderTopLeftHeader = () => (
     <div className="layer-ui__header zen-mode-transition">
@@ -218,7 +219,9 @@ const LayerUI = ({
         })}
         title={projectTitle}
       >
-        <span className="layer-ui__header__project-nameLabel">正在编辑：</span>
+        <span className="layer-ui__header__project-nameLabel">
+          {projectLabel}
+        </span>
         <span className="layer-ui__header__project-nameValue">
           {projectName}
         </span>
@@ -329,7 +332,6 @@ const LayerUI = ({
                           />
                         </Stack.Row>
                       </Island>
-                      <SubtypeToggles />
                       {isCollaborating && (
                         <Island
                           style={{

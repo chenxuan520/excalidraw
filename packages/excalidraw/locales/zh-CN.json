@@ -541,6 +541,7 @@
     "fileManager": {
       "title": "管理文件",
       "currentPath": "当前路径：{{path}}",
+      "serverUrl": "服务器：{{url}}",
       "remoteDirtyWarning": "当前画布有未保存到云端的改动。",
       "searchLabel": "搜索文件",
       "searchPlaceholder": "输入文件名，支持模糊搜索",

@@ -90,7 +90,6 @@ export const MobileMenu = ({
                     />
                   </Stack.Row>
                 </Island>
-                <SubtypeToggles />
                 {renderTopRightUI && renderTopRightUI(true, appState)}
                 <div className="mobile-misc-tools-container">
                   {!appState.viewModeEnabled && (
