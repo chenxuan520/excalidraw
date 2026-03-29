@@ -496,6 +496,11 @@
         "button": "保存到本地",
         "description": "将画布数据导出为文件，以便以后导入。"
       },
+      "saveToCloud": {
+        "title": "保存到云端文件",
+        "button": "保存到云端文件",
+        "description": "先把当前画布保存回当前云端文件，再继续切换。"
+      },
       "excalidrawPlus": {
         "title": "Excalidraw+",
         "button": "导出到 Excalidraw+",
@@ -512,6 +517,11 @@
         "title": "从链接加载",
         "button": "替换我的内容",
         "description": "加载外部绘图将<bold>替换您现有的内容</bold>。<br></br>您可以先使用下列方式备份您的绘图。"
+      },
+      "webdavSwitch": {
+        "title": "加载云端文件",
+        "button": "加载云端文件",
+        "description": "加载另一个云端文件将<bold>替换您现有的内容</bold>。<br></br>当前云端文件还有未保存改动，您可以先使用下列方式保存。"
       }
     }
   },

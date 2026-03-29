@@ -191,6 +191,14 @@ const renderExternalSceneOverwriteDescription = () => (
   />
 );
 
+const renderWebDAVSwitchOverwriteDescription = () => (
+  <Trans
+    i18nKey="overwriteConfirm.modal.webdavSwitch.description"
+    bold={(text) => <strong>{text}</strong>}
+    br={() => <br />}
+  />
+);
+
 const getCurrentSceneName = (excalidrawAPI: ExcalidrawImperativeAPI | null) => {
   return (excalidrawAPI?.getAppState().name || "").replace(/\.excalidraw$/, "");
 };
@@ -231,7 +239,7 @@ const initializeScene = async (opts: {
         description: renderExternalSceneOverwriteDescription(),
         actionLabel: t("overwriteConfirm.modal.shareableLink.button"),
         color: "danger",
-      }))
+      })) === "confirm"
     ) {
       if (jsonBackendMatch) {
         scene = await loadScene(
@@ -275,7 +283,7 @@ const initializeScene = async (opts: {
           description: renderExternalSceneOverwriteDescription(),
           actionLabel: t("overwriteConfirm.modal.shareableLink.button"),
           color: "danger",
-        }))
+        })) === "confirm"
       ) {
         return { scene: data, isExternalScene };
       }
@@ -423,17 +431,35 @@ const ExcalidrawWrapper = () => {
       if (!excalidrawAPI || !webdavSession.config) {
         return;
       }
-      const existingElements = excalidrawAPI.getSceneElements();
-      if (
-        (existingElements.length > 0 || webdavSession.remoteDirty) &&
-        !(await openConfirmModal({
-          title: t("overwriteConfirm.modal.shareableLink.title"),
-          description: renderExternalSceneOverwriteDescription(),
-          actionLabel: t("overwriteConfirm.modal.shareableLink.button"),
+      const shouldConfirmWebDAVSwitch =
+        webdavSession.isCurrentSceneWebDAV && webdavSession.remoteDirty;
+
+      if (shouldConfirmWebDAVSwitch) {
+        const result = await openConfirmModal({
+          title: t("overwriteConfirm.modal.webdavSwitch.title"),
+          description: renderWebDAVSwitchOverwriteDescription(),
+          actionLabel: t("overwriteConfirm.modal.webdavSwitch.button"),
           color: "danger",
-        }))
-      ) {
-        return;
+          actions: [
+            {
+              key: "save-to-cloud",
+              title: t("overwriteConfirm.action.saveToCloud.title"),
+              description: t("overwriteConfirm.action.saveToCloud.description"),
+              actionLabel: t("overwriteConfirm.action.saveToCloud.button"),
+            },
+          ],
+        });
+
+        if (result === "cancel") {
+          return;
+        }
+
+        if (result === "save-to-cloud") {
+          const saved = await saveCurrentSceneToWebDAV();
+          if (!saved) {
+            return;
+          }
+        }
       }
 
       const targetFile = webdavFiles.find((file) => file.path === path) || null;
@@ -455,6 +481,9 @@ const ExcalidrawWrapper = () => {
           elements: data.elements,
           appState: data.appState,
           storeAction: StoreAction.CAPTURE,
+        });
+        excalidrawAPI.scrollToContent(data.elements, {
+          fitToContent: true,
         });
         const activeFile =
           targetFile ||
@@ -491,6 +520,7 @@ const ExcalidrawWrapper = () => {
         updateStoredWebDAVSession(path);
         excalidrawAPI.setToast({
           message: t("webdav.toast.loaded", { name: activeFile.name }),
+          duration: 1500,
         });
       } catch (error: any) {
         setWebdavSession((current) => ({
@@ -580,7 +610,7 @@ const ExcalidrawWrapper = () => {
       color: "danger",
     });
 
-    if (!confirmed) {
+    if (confirmed !== "confirm") {
       return;
     }
 
@@ -595,7 +625,10 @@ const ExcalidrawWrapper = () => {
       },
       storeAction: StoreAction.UPDATE,
     });
-    excalidrawAPI?.setToast({ message: t("webdav.toast.loggedOut") });
+    excalidrawAPI?.setToast({
+      message: t("webdav.toast.loggedOut"),
+      duration: 1500,
+    });
   }, [
     excalidrawAPI,
     setWebDAVFileManagerOpen,
@@ -607,15 +640,16 @@ const ExcalidrawWrapper = () => {
   const saveCurrentSceneToWebDAV = useCallback(
     async (targetPath?: string | null) => {
       if (!excalidrawAPI || !webdavSession.config) {
-        return;
+        return false;
       }
       const resolvedPath = targetPath || webdavSession.activeFile?.path;
       if (!resolvedPath) {
         setWebDAVFileManagerOpen(true);
         excalidrawAPI.setToast({
           message: t("webdav.toast.selectFileFirst"),
+          duration: 1500,
         });
-        return;
+        return false;
       }
       setWebdavSession((current) => ({
         ...current,
@@ -661,12 +695,14 @@ const ExcalidrawWrapper = () => {
             duration: 1500,
           });
         }, 0);
+        return true;
       } catch (error: any) {
         setWebdavSession((current) => ({
           ...current,
           isSaving: false,
           error: error.message || t("webdav.errors.saveFailed"),
         }));
+        return false;
       }
     },
     [
@@ -690,14 +726,14 @@ const ExcalidrawWrapper = () => {
         file.path !== webdavSession.activeFile?.path;
       if (
         isOverwritingDifferentFile &&
-        !(await openConfirmModal({
+        (await openConfirmModal({
           title: t("webdav.confirm.overwriteTitle"),
           description: t("webdav.confirm.overwriteDescription", {
             name: file.name,
           }),
           actionLabel: t("webdav.confirm.overwriteAction"),
           color: "danger",
-        }))
+        })) !== "confirm"
       ) {
         return;
       }
@@ -767,7 +803,10 @@ const ExcalidrawWrapper = () => {
         remoteDirty: false,
       }));
       updateStoredWebDAVSession(remotePath, webdavSession.config);
-      excalidrawAPI.setToast({ message: t("webdav.toast.created") });
+      excalidrawAPI.setToast({
+        message: t("webdav.toast.created"),
+        duration: 1500,
+      });
     },
     [
       excalidrawAPI,
@@ -799,7 +838,10 @@ const ExcalidrawWrapper = () => {
         isCurrentSceneWebDAV: activeFile !== null,
       }));
       updateStoredWebDAVSession(activeFile?.path || null, webdavSession.config);
-      excalidrawAPI?.setToast({ message: t("webdav.toast.renamed") });
+      excalidrawAPI?.setToast({
+        message: t("webdav.toast.renamed"),
+        duration: 1500,
+      });
     },
     [
       excalidrawAPI,
@@ -824,7 +866,7 @@ const ExcalidrawWrapper = () => {
         actionLabel: t("labels.delete"),
         color: "danger",
       });
-      if (!confirmed) {
+      if (confirmed !== "confirm") {
         return;
       }
       await deleteWebDAVFile(webdavSession.config, file.path);
@@ -839,7 +881,10 @@ const ExcalidrawWrapper = () => {
         isCurrentSceneWebDAV: activeFile !== null,
       }));
       updateStoredWebDAVSession(activeFile?.path || null, webdavSession.config);
-      excalidrawAPI?.setToast({ message: t("webdav.toast.deleted") });
+      excalidrawAPI?.setToast({
+        message: t("webdav.toast.deleted"),
+        duration: 1500,
+      });
     },
     [
       excalidrawAPI,

@@ -30,19 +30,18 @@ const OverwriteConfirmDialog = Object.assign(
         return null;
       }
 
-      const handleClose = () => {
-        overwriteConfirmState.onClose();
-        setState((state) => ({ ...state, active: false }));
-      };
-
-      const handleConfirm = () => {
-        overwriteConfirmState.onConfirm();
-        setState((state) => ({ ...state, active: false }));
+      const handleResolve = (result: "confirm" | "cancel" | "save-to-cloud") => {
+        overwriteConfirmState.onResolve(result);
+        setState({ active: false });
       };
 
       return (
         <OverwriteConfirmDialogTunnel.In>
-          <Dialog onCloseRequest={handleClose} title={false} size={916}>
+          <Dialog
+            onCloseRequest={() => handleResolve("cancel")}
+            title={false}
+            size={916}
+          >
             <div className="OverwriteConfirm">
               <h3>{overwriteConfirmState.title}</h3>
               <div
@@ -57,10 +56,22 @@ const OverwriteConfirmDialog = Object.assign(
                   color={overwriteConfirmState.color}
                   size="large"
                   label={overwriteConfirmState.actionLabel}
-                  onClick={handleConfirm}
+                  onClick={() => handleResolve("confirm")}
                 />
               </div>
-              <Actions>{children}</Actions>
+              <Actions>
+                {children}
+                {overwriteConfirmState.actions?.map((action) => (
+                  <Action
+                    key={action.key}
+                    title={action.title}
+                    actionLabel={action.actionLabel}
+                    onClick={() => handleResolve(action.key)}
+                  >
+                    {action.description}
+                  </Action>
+                ))}
+              </Actions>
             </div>
           </Dialog>
         </OverwriteConfirmDialogTunnel.In>

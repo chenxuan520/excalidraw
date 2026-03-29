@@ -8,8 +8,7 @@
 <h4 align="center">
   <a href="https://excalidraw.com">Excalidraw Editor</a> |
   <a href="https://blog.excalidraw.com">Blog</a> |
-  <a href="https://docs.excalidraw.com">Documentation</a> |
-  <a href="https://plus.excalidraw.com">Excalidraw+</a>
+  <a href="https://docs.excalidraw.com">Documentation</a>
 </h4>
 
 <div align="center">
@@ -31,12 +30,6 @@
   <a href="https://docs.excalidraw.com/docs/introduction/contributing">
     <img alt="PRs welcome!" src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat"  />
   </a>
-  <a href="https://discord.gg/UexuTaE">
-    <img alt="Chat on Discord" src="https://img.shields.io/discord/723672430744174682?color=738ad6&label=Chat%20on%20Discord&logo=discord&logoColor=ffffff&widge=false"/>
-  </a>
-  <a href="https://twitter.com/excalidraw">
-    <img alt="Follow Excalidraw on Twitter" src="https://img.shields.io/twitter/follow/excalidraw.svg?label=follow+@excalidraw&style=social&logo=twitter"/>
-  </a>
 </p>
 
 <div align="center">
@@ -54,28 +47,43 @@
 
 ---
 
-# 本仓库改进点
+# 本仓库改动说明
 
-1. 支持使用中文字体
-2. 支持 latex 公式
-3. 支持嵌入网页所有 url(原仓库只支持部分 url)
-4. 自动打包成前端静态文件在 release 中, 下载可直接使用
-5. 删除跟踪统计数据的部分
+这是一个基于 Excalidraw 的定制 fork，当前主要改动如下：
 
-# 编译运行方式
+1. 支持中文字体显示与编辑
+2. 支持 LaTeX / 数学公式输入
+3. 放宽网页嵌入限制，支持更多 URL 直接嵌入
+4. 新增 WebDAV 在线模式，支持登录、管理云端文件、保存到云端、加载云端文件
+5. 针对 WebDAV 场景补充了本地文件 / 云端文件区分、未保存提示、文件切换确认等交互
+6. 隐藏了 AI 相关入口（如 Text to Diagram、Magic Frame、AI 设置等）
+7. 移除了跟踪/统计相关代码
+8. release 中提供可直接使用的前端静态构建产物
 
-- 编译
+# 开发与构建
 
+- 安装依赖
+
+```bash
+yarn
 ```
-yarn install
-cd excalidraw-app
+
+- 本地开发
+
+```bash
+yarn start
+```
+
+- 构建前端
+
+```bash
 yarn build
 ```
 
-- 运行
+构建产物位于：
 
-```
-yarn run start
+```text
+excalidraw-app/build
 ```
 
 ---
@@ -130,7 +138,7 @@ Check out our [documentation](https://docs.excalidraw.com/docs/@excalidraw/excal
 ## Contributing
 
 - Missing something or found a bug? [Report here](https://github.com/excalidraw/excalidraw/issues).
-- Want to contribute? Check out our [contribution guide](https://docs.excalidraw.com/docs/introduction/contributing) or let us know on [Discord](https://discord.gg/UexuTaE).
+- Want to contribute? Check out our [contribution guide](https://docs.excalidraw.com/docs/introduction/contributing).
 - Want to help with translations? See the [translation guide](https://docs.excalidraw.com/docs/introduction/contributing#translating).
 
 ## Integrations
@@ -142,16 +150,3 @@ Check out our [documentation](https://docs.excalidraw.com/docs/@excalidraw/excal
 
 [Google Cloud](https://googlecloudcheatsheet.withgoogle.com/architecture) • [Meta](https://meta.com/) • [CodeSandbox](https://codesandbox.io/) • [Obsidian Excalidraw](https://github.com/zsviczian/obsidian-excalidraw-plugin) • [Replit](https://replit.com/) • [Slite](https://slite.com/) • [Notion](https://notion.so/) • [HackerRank](https://www.hackerrank.com/) • and many others
 
-## Sponsors & support
-
-If you like the project, you can become a sponsor at [Open Collective](https://opencollective.com/excalidraw) or use [Excalidraw+](https://plus.excalidraw.com/).
-
-## Thank you for supporting Excalidraw
-
-[<img src="https://opencollective.com/excalidraw/tiers/sponsors/0/avatar.svg?avatarHeight=120"/>](https://opencollective.com/excalidraw/tiers/sponsors/0/website) [<img src="https://opencollective.com/excalidraw/tiers/sponsors/1/avatar.svg?avatarHeight=120"/>](https://opencollective.com/excalidraw/tiers/sponsors/1/website) [<img src="https://opencollective.com/excalidraw/tiers/sponsors/2/avatar.svg?avatarHeight=120"/>](https://opencollective.com/excalidraw/tiers/sponsors/2/website) [<img src="https://opencollective.com/excalidraw/tiers/sponsors/3/avatar.svg?avatarHeight=120"/>](https://opencollective.com/excalidraw/tiers/sponsors/3/website) [<img src="https://opencollective.com/excalidraw/tiers/sponsors/4/avatar.svg?avatarHeight=120"/>](https://opencollective.com/excalidraw/tiers/sponsors/4/website) [<img src="https://opencollective.com/excalidraw/tiers/sponsors/5/avatar.svg?avatarHeight=120"/>](https://opencollective.com/excalidraw/tiers/sponsors/5/website) [<img src="https://opencollective.com/excalidraw/tiers/sponsors/6/avatar.svg?avatarHeight=120"/>](https://opencollective.com/excalidraw/tiers/sponsors/6/website) [<img src="https://opencollective.com/excalidraw/tiers/sponsors/7/avatar.svg?avatarHeight=120"/>](https://opencollective.com/excalidraw/tiers/sponsors/7/website) [<img src="https://opencollective.com/excalidraw/tiers/sponsors/8/avatar.svg?avatarHeight=120"/>](https://opencollective.com/excalidraw/tiers/sponsors/8/website) [<img src="https://opencollective.com/excalidraw/tiers/sponsors/9/avatar.svg?avatarHeight=120"/>](https://opencollective.com/excalidraw/tiers/sponsors/9/website) [<img src="https://opencollective.com/excalidraw/tiers/sponsors/10/avatar.svg?avatarHeight=120"/>](https://opencollective.com/excalidraw/tiers/sponsors/10/website)
-
-<a href="https://opencollective.com/excalidraw#category-CONTRIBUTE" target="_blank"><img src="https://opencollective.com/excalidraw/tiers/backers.svg?avatarHeight=32"/></a>
-
-Last but not least, we're thankful to these companies for offering their services for free:
-
-[![Vercel](./.github/assets/vercel.svg)](https://vercel.com) [![Sentry](./.github/assets/sentry.svg)](https://sentry.io) [![Crowdin](./.github/assets/crowdin.svg)](https://crowdin.com)
