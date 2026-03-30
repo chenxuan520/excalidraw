@@ -6,7 +6,11 @@ import {
 } from "../../packages/excalidraw/appState";
 import { clearElementsForLocalStorage } from "../../packages/excalidraw/element";
 import { STORAGE_KEYS } from "../app_constants";
-import type { WebDAVConfig, WebDAVStoredSession } from "../webdav/state";
+import type {
+  WebDAVConfig,
+  WebDAVRestoreMode,
+  WebDAVStoredSession,
+} from "../webdav/state";
 
 export const saveUsernameToLocalStorage = (username: string) => {
   try {
@@ -105,11 +109,15 @@ export const getTotalStorageSize = () => {
 export const saveWebDAVConfigToLocalStorage = (
   config: WebDAVConfig,
   activeFilePath: string | null,
+  restoreMode: WebDAVRestoreMode = "remote",
+  lastSyncedContent: string | null = null,
 ) => {
   try {
     const payload: WebDAVStoredSession = {
       ...config,
       activeFilePath,
+      restoreMode,
+      lastSyncedContent,
     };
     localStorage.setItem(
       STORAGE_KEYS.LOCAL_STORAGE_WEBDAV,
@@ -127,8 +135,11 @@ export const importWebDAVConfigFromLocalStorage =
       if (!data) {
         return null;
       }
-      const parsed = JSON.parse(data) as Partial<WebDAVStoredSession>;
+      const parsed = JSON.parse(data) as
+        | (Partial<WebDAVStoredSession> & { remoteDirty?: boolean })
+        | null;
       if (
+        !parsed ||
         typeof parsed.serverUrl !== "string" ||
         typeof parsed.basePath !== "string" ||
         typeof parsed.username !== "string" ||
@@ -144,6 +155,11 @@ export const importWebDAVConfigFromLocalStorage =
         activeFilePath:
           typeof parsed.activeFilePath === "string"
             ? parsed.activeFilePath
+            : null,
+        restoreMode: parsed.restoreMode === "draft" ? "draft" : "remote",
+        lastSyncedContent:
+          typeof parsed.lastSyncedContent === "string"
+            ? parsed.lastSyncedContent
             : null,
       };
     } catch (error: any) {

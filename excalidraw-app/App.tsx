@@ -65,6 +65,7 @@ import {
 } from "./data/localStorage";
 import CustomStats from "./CustomStats";
 import type { RestoredDataState } from "../packages/excalidraw/data/restore";
+import type { ImportedDataState } from "../packages/excalidraw/data/types";
 import { restore, restoreAppState } from "../packages/excalidraw/data/restore";
 import { updateStaleImageStatuses } from "./data/FileManager";
 import { newElementWith } from "../packages/excalidraw/element/mutateElement";
@@ -128,7 +129,12 @@ import {
   webdavLoginDialogOpenAtom,
   webdavSessionAtom,
 } from "./webdav/state";
-import type { WebDAVConfig, WebDAVFileEntry } from "./webdav/state";
+import type {
+  WebDAVConfig,
+  WebDAVFileEntry,
+  WebDAVRestoreMode,
+  WebDAVStoredSession,
+} from "./webdav/state";
 import { WebDAVTopRight } from "./webdav/WebDAVTopRight";
 import { WebDAVLoginDialog } from "./webdav/WebDAVLoginDialog";
 import { WebDAVFileManagerDialog } from "./webdav/WebDAVFileManagerDialog";
@@ -206,6 +212,7 @@ const getCurrentSceneName = (excalidrawAPI: ExcalidrawImperativeAPI | null) => {
 const initializeScene = async (opts: {
   collabAPI: CollabAPI | null;
   excalidrawAPI: ExcalidrawImperativeAPI;
+  localDataState?: ImportedDataState | null;
 }): Promise<
   { scene: ExcalidrawInitialDataState | null } & (
     | { isExternalScene: true; id: string; key: string }
@@ -219,7 +226,10 @@ const initializeScene = async (opts: {
   );
   const externalUrlMatch = window.location.hash.match(/^#url=(.*)$/);
 
-  const localDataState = importFromLocalStorage();
+  const localDataState =
+    opts.localDataState !== undefined
+      ? opts.localDataState
+      : importFromLocalStorage();
 
   let scene: RestoredDataState & {
     scrollToContent?: boolean;
@@ -366,6 +376,10 @@ const ExcalidrawWrapper = () => {
   const isApplyingRemoteSceneRef = useRef(false);
   const ignoreNextWebDAVChangeRef = useRef(false);
   const lastSyncedWebDAVContentRef = useRef<string | null>(null);
+  const pendingWebDAVRestorePathRef = useRef<string | null>(null);
+  const webdavRestoreSnapshotRef = useRef<WebDAVStoredSession | null>(
+    importWebDAVConfigFromLocalStorage(),
+  );
 
   // initial state
   // ---------------------------------------------------------------------------
@@ -392,6 +406,21 @@ const ExcalidrawWrapper = () => {
   useMathSubtype(excalidrawAPI);
 
   const [collabAPI] = useAtom(collabAPIAtom);
+
+  const getInitialLocalDataState = useCallback((): ImportedDataState | null => {
+    const localDataState = importFromLocalStorage();
+    const snapshot = webdavRestoreSnapshotRef.current;
+
+    if (snapshot?.activeFilePath && snapshot.restoreMode === "remote") {
+      return {
+        appState: localDataState.appState,
+        elements: [],
+      };
+    }
+
+    return localDataState;
+  }, []);
+
   const [isCollaborating] = useAtomWithInitialValue(isCollaboratingAtom, () => {
     return isCollaborationLink(window.location.href);
   });
@@ -417,22 +446,138 @@ const ExcalidrawWrapper = () => {
   );
 
   const updateStoredWebDAVSession = useCallback(
-    (activeFilePath: string | null, config = webdavSession.config) => {
+    (snapshot: Partial<WebDAVStoredSession> & { config?: WebDAVConfig | null }) => {
+      const config = snapshot.config ?? webdavSession.config;
       if (!config) {
         return;
       }
-      saveWebDAVConfigToLocalStorage(config, activeFilePath);
+
+      const nextSnapshot: WebDAVStoredSession = {
+        serverUrl: config.serverUrl,
+        basePath: config.basePath,
+        username: config.username,
+        password: config.password,
+        activeFilePath:
+          snapshot.activeFilePath !== undefined
+            ? snapshot.activeFilePath
+            : webdavRestoreSnapshotRef.current?.activeFilePath ?? null,
+        restoreMode:
+          snapshot.restoreMode ??
+          webdavRestoreSnapshotRef.current?.restoreMode ??
+          "remote",
+        lastSyncedContent:
+          snapshot.lastSyncedContent !== undefined
+            ? snapshot.lastSyncedContent
+            : webdavRestoreSnapshotRef.current?.lastSyncedContent ?? null,
+      };
+
+      webdavRestoreSnapshotRef.current = nextSnapshot;
+      saveWebDAVConfigToLocalStorage(
+        config,
+        nextSnapshot.activeFilePath,
+        nextSnapshot.restoreMode,
+        nextSnapshot.lastSyncedContent,
+      );
     },
     [webdavSession.config],
   );
 
+  const clearWebDAVBinding = useCallback(
+    (config = webdavSession.config) => {
+      lastSyncedWebDAVContentRef.current = null;
+      pendingWebDAVRestorePathRef.current = null;
+      if (config) {
+        updateStoredWebDAVSession({
+          config,
+          activeFilePath: null,
+          restoreMode: "remote",
+          lastSyncedContent: null,
+        });
+      } else {
+        webdavRestoreSnapshotRef.current = null;
+      }
+      setWebdavSession((current) => ({
+        ...current,
+        activeFile: null,
+        sceneSource: "local",
+        documentStatus: "local-only",
+        isCurrentSceneWebDAV: false,
+        isSaving: false,
+        isLoadingFile: false,
+        remoteDirty: false,
+      }));
+    },
+    [setWebdavSession, updateStoredWebDAVSession, webdavSession.config],
+  );
+
+  const applyWebDAVSyncedState = useCallback(
+    (
+      activeFile: WebDAVFileEntry | null,
+      syncedContent: string | null,
+      restoreMode: WebDAVRestoreMode = "remote",
+      config = webdavSession.config,
+    ) => {
+      lastSyncedWebDAVContentRef.current = syncedContent;
+      updateStoredWebDAVSession({
+        config,
+        activeFilePath: activeFile?.path || null,
+        restoreMode,
+        lastSyncedContent: syncedContent,
+      });
+      setWebdavSession((current) => ({
+        ...current,
+        activeFile,
+        sceneSource: activeFile ? "webdav" : "local",
+        documentStatus: activeFile
+          ? restoreMode === "draft"
+            ? "dirty"
+            : "clean"
+          : "local-only",
+        isCurrentSceneWebDAV: activeFile !== null,
+        isLoadingFile: false,
+        remoteDirty: activeFile !== null && restoreMode === "draft",
+        error: null,
+      }));
+    },
+    [setWebdavSession, updateStoredWebDAVSession, webdavSession.config],
+  );
+
+  const getCurrentWebDAVSyncedContent = useCallback(
+    (activeFileName?: string | null) => {
+      if (!excalidrawAPI) {
+        return null;
+      }
+      const normalizedSyncedState = {
+        ...excalidrawAPI.getAppState(),
+        name: activeFileName?.replace(/\.excalidraw$/, "") || "",
+      };
+      return serializeAsJSON(
+        excalidrawAPI.getSceneElements(),
+        normalizedSyncedState,
+        excalidrawAPI.getFiles(),
+        "local",
+      );
+    },
+    [excalidrawAPI],
+  );
+
   const loadWebDAVFile = useCallback(
-    async (path: string) => {
-      if (!excalidrawAPI || !webdavSession.config) {
+    async (
+      path: string,
+      options?: {
+        config?: WebDAVConfig | null;
+        skipDirtyConfirm?: boolean;
+      },
+    ) => {
+      const resolvedConfig = options?.config || webdavSession.config;
+      if (!excalidrawAPI || !resolvedConfig) {
         return;
       }
       const shouldConfirmWebDAVSwitch =
-        webdavSession.isCurrentSceneWebDAV && webdavSession.remoteDirty;
+        !options?.skipDirtyConfirm &&
+        webdavSession.activeFile?.path !== path &&
+        webdavSession.isCurrentSceneWebDAV &&
+        webdavSession.remoteDirty;
 
       if (shouldConfirmWebDAVSwitch) {
         const result = await openConfirmModal({
@@ -465,26 +610,19 @@ const ExcalidrawWrapper = () => {
       const targetFile = webdavFiles.find((file) => file.path === path) || null;
       setWebdavSession((current) => ({
         ...current,
+        sceneSource: "webdav",
+        documentStatus: "loading-remote",
+        isCurrentSceneWebDAV: true,
         isLoadingFile: true,
         error: null,
       }));
       try {
-        const blob = await downloadWebDAVFile(webdavSession.config, path);
+        const blob = await downloadWebDAVFile(resolvedConfig, path);
         const data = await loadFromBlob(
           blob,
           excalidrawAPI.getAppState(),
           excalidrawAPI.getSceneElementsIncludingDeleted(),
         );
-        isApplyingRemoteSceneRef.current = true;
-        excalidrawAPI.addFiles(Object.values(data.files || {}));
-        excalidrawAPI.updateScene({
-          elements: data.elements,
-          appState: data.appState,
-          storeAction: StoreAction.CAPTURE,
-        });
-        excalidrawAPI.scrollToContent(data.elements, {
-          fitToContent: true,
-        });
         const activeFile =
           targetFile ||
           ({
@@ -495,29 +633,30 @@ const ExcalidrawWrapper = () => {
             lastModified: null,
             size: null,
           } as const);
-        setWebdavSession((current) => ({
-          ...current,
-          activeFile,
-          remoteDirty: false,
-          isCurrentSceneWebDAV: true,
-          isLoadingFile: false,
-        }));
-        lastSyncedWebDAVContentRef.current = serializeAsJSON(
+        const normalizedAppState = {
+          ...data.appState,
+          name: activeFile.name.replace(/\.excalidraw$/, ""),
+        };
+        isApplyingRemoteSceneRef.current = true;
+        excalidrawAPI.addFiles(Object.values(data.files || {}));
+        excalidrawAPI.updateScene({
+          elements: data.elements,
+          appState: normalizedAppState,
+          storeAction: StoreAction.CAPTURE,
+        });
+        excalidrawAPI.scrollToContent(data.elements, {
+          fitToContent: true,
+        });
+        const syncedContent = serializeAsJSON(
           data.elements,
+          normalizedAppState,
           {
-            ...data.appState,
-            name: activeFile.name.replace(/\.excalidraw$/, ""),
+            ...excalidrawAPI.getFiles(),
+            ...(data.files || {}),
           },
-          data.files || {},
           "local",
         );
-        excalidrawAPI.updateScene({
-          appState: {
-            name: activeFile.name.replace(/\.excalidraw$/, ""),
-          },
-          storeAction: StoreAction.UPDATE,
-        });
-        updateStoredWebDAVSession(path);
+        applyWebDAVSyncedState(activeFile, syncedContent, "remote", resolvedConfig);
         excalidrawAPI.setToast({
           message: t("webdav.toast.loaded", { name: activeFile.name }),
           duration: 1500,
@@ -525,6 +664,12 @@ const ExcalidrawWrapper = () => {
       } catch (error: any) {
         setWebdavSession((current) => ({
           ...current,
+          sceneSource: current.activeFile ? "webdav" : "local",
+          documentStatus: current.activeFile
+            ? current.remoteDirty
+              ? "dirty"
+              : "clean"
+            : "local-only",
           isLoadingFile: false,
           error: error.message || t("webdav.errors.loadFailed"),
         }));
@@ -536,16 +681,17 @@ const ExcalidrawWrapper = () => {
       }
     },
     [
+      applyWebDAVSyncedState,
       excalidrawAPI,
-      updateStoredWebDAVSession,
       webdavFiles,
       webdavSession.config,
+      webdavSession.isCurrentSceneWebDAV,
       webdavSession.remoteDirty,
       setWebdavSession,
     ],
   );
 
-  const handleWebDAVLogin = useCallback(
+  const restoreWebDAVSession = useCallback(
     async (config: WebDAVConfig) => {
       const normalizedConfig = {
         ...config,
@@ -562,44 +708,78 @@ const ExcalidrawWrapper = () => {
       try {
         await validateWebDAVConfig(normalizedConfig);
         const files = await listExcalidrawFiles(normalizedConfig);
-        const stored = importWebDAVConfigFromLocalStorage();
+        const stored = webdavRestoreSnapshotRef.current;
         const nextActiveFile =
           files.find((file) => file.path === stored?.activeFilePath) || null;
+        const restoreMode =
+          nextActiveFile && stored?.restoreMode === "draft" ? "draft" : "remote";
+        const isRemoteRestore = nextActiveFile !== null && restoreMode === "remote";
+        pendingWebDAVRestorePathRef.current = isRemoteRestore
+          ? nextActiveFile?.path || null
+          : null;
+
+        if (stored) {
+          webdavRestoreSnapshotRef.current = {
+            ...stored,
+            ...normalizedConfig,
+            activeFilePath: nextActiveFile?.path || null,
+            restoreMode,
+          };
+        }
+
+        lastSyncedWebDAVContentRef.current = stored?.lastSyncedContent ?? null;
         setWebdavFiles(files);
         setWebdavSession({
           loggedIn: true,
           config: normalizedConfig,
           activeFile: nextActiveFile,
+          sceneSource: nextActiveFile ? "webdav" : "local",
+          documentStatus: nextActiveFile
+            ? isRemoteRestore
+              ? "loading-remote"
+              : "dirty"
+            : "local-only",
           isCurrentSceneWebDAV: nextActiveFile !== null,
           isConnecting: false,
           isSaving: false,
-          isLoadingFile: false,
-          remoteDirty: false,
+          isLoadingFile: isRemoteRestore && Boolean(excalidrawAPI),
+          remoteDirty: nextActiveFile !== null && restoreMode === "draft",
           error: null,
         });
-        saveWebDAVConfigToLocalStorage(
-          normalizedConfig,
-          nextActiveFile?.path || null,
-        );
+        updateStoredWebDAVSession({
+          config: normalizedConfig,
+          activeFilePath: nextActiveFile?.path || null,
+          restoreMode,
+          lastSyncedContent: stored?.lastSyncedContent ?? null,
+        });
         setWebDAVLoginOpen(false);
-        if (nextActiveFile && excalidrawAPI) {
-          await loadWebDAVFile(nextActiveFile.path);
-        }
+
+        return {
+          config: normalizedConfig,
+          activeFile: nextActiveFile,
+          restoreMode,
+        };
       } catch (error: any) {
         setWebdavSession((current) => ({
           ...current,
           isConnecting: false,
+          isLoadingFile: false,
           error: error.message || t("webdav.errors.loginFailed"),
         }));
+        return null;
       }
     },
-    [
-      excalidrawAPI,
-      loadWebDAVFile,
-      setWebDAVLoginOpen,
-      setWebdavFiles,
-      setWebdavSession,
-    ],
+    [excalidrawAPI, setWebDAVLoginOpen, setWebdavFiles, setWebdavSession, updateStoredWebDAVSession],
+  );
+
+  const handleWebDAVLogin = useCallback(
+    async (config: WebDAVConfig) => {
+      const restored = await restoreWebDAVSession(config);
+      if (restored?.activeFile && restored.restoreMode === "remote") {
+        pendingWebDAVRestorePathRef.current = restored.activeFile.path;
+      }
+    },
+    [excalidrawAPI, loadWebDAVFile, restoreWebDAVSession],
   );
 
   const handleWebDAVLogout = useCallback(async () => {
@@ -615,6 +795,9 @@ const ExcalidrawWrapper = () => {
     }
 
     clearWebDAVConfigFromLocalStorage();
+    lastSyncedWebDAVContentRef.current = null;
+    pendingWebDAVRestorePathRef.current = null;
+    webdavRestoreSnapshotRef.current = null;
     setWebdavFiles([]);
     setWebdavSession(initialWebDAVSessionState);
     setWebDAVFileManagerOpen(false);
@@ -668,26 +851,15 @@ const ExcalidrawWrapper = () => {
         const activeFile =
           files.find((file) => file.path === resolvedPath) ||
           webdavSession.activeFile;
-        const normalizedSyncedState = {
-          ...excalidrawAPI.getAppState(),
-          name: activeFile?.name.replace(/\.excalidraw$/, "") || "",
-        };
-        const syncedContent = serializeAsJSON(
-          excalidrawAPI.getSceneElements(),
-          normalizedSyncedState,
-          excalidrawAPI.getFiles(),
-          "local",
-        );
+        const syncedContent = getCurrentWebDAVSyncedContent(activeFile?.name);
+        if (!syncedContent) {
+          return false;
+        }
+        applyWebDAVSyncedState(activeFile || null, syncedContent, "remote");
         setWebdavSession((current) => ({
           ...current,
-          activeFile: activeFile || null,
-          isCurrentSceneWebDAV: true,
           isSaving: false,
-          remoteDirty: false,
-          error: null,
         }));
-        lastSyncedWebDAVContentRef.current = syncedContent;
-        updateStoredWebDAVSession(resolvedPath, webdavSession.config);
         ignoreNextWebDAVChangeRef.current = true;
         window.setTimeout(() => {
           excalidrawAPI.setToast({
@@ -761,13 +933,10 @@ const ExcalidrawWrapper = () => {
         createEmptyExcalidrawContent(fileName),
       );
       const files = await refreshWebDAVFiles(webdavSession.config);
-      setWebdavSession((current) => ({
-        ...current,
-        activeFile: files.find((file) => file.path === remotePath) || null,
-        remoteDirty: false,
-      }));
-      updateStoredWebDAVSession(remotePath, webdavSession.config);
-      await loadWebDAVFile(remotePath);
+      const activeFile = files.find((file) => file.path === remotePath) || null;
+      pendingWebDAVRestorePathRef.current = null;
+      applyWebDAVSyncedState(activeFile, createEmptyExcalidrawContent(fileName), "remote");
+      await loadWebDAVFile(remotePath, { skipDirtyConfirm: true });
     },
     [
       loadWebDAVFile,
@@ -796,13 +965,7 @@ const ExcalidrawWrapper = () => {
       );
       const files = await refreshWebDAVFiles(webdavSession.config);
       const activeFile = files.find((file) => file.path === remotePath) || null;
-      setWebdavSession((current) => ({
-        ...current,
-        activeFile,
-        isCurrentSceneWebDAV: true,
-        remoteDirty: false,
-      }));
-      updateStoredWebDAVSession(remotePath, webdavSession.config);
+      applyWebDAVSyncedState(activeFile, content, "remote");
       excalidrawAPI.setToast({
         message: t("webdav.toast.created"),
         duration: 1500,
@@ -832,12 +995,11 @@ const ExcalidrawWrapper = () => {
         webdavSession.activeFile?.path === file.path
           ? files.find((item) => item.path === nextPath) || null
           : webdavSession.activeFile;
-      setWebdavSession((current) => ({
-        ...current,
+      applyWebDAVSyncedState(
         activeFile,
-        isCurrentSceneWebDAV: activeFile !== null,
-      }));
-      updateStoredWebDAVSession(activeFile?.path || null, webdavSession.config);
+        activeFile?.path ? lastSyncedWebDAVContentRef.current : null,
+        activeFile?.path ? (webdavSession.remoteDirty ? "draft" : "remote") : "remote",
+      );
       excalidrawAPI?.setToast({
         message: t("webdav.toast.renamed"),
         duration: 1500,
@@ -870,17 +1032,21 @@ const ExcalidrawWrapper = () => {
         return;
       }
       await deleteWebDAVFile(webdavSession.config, file.path);
-      await refreshWebDAVFiles(webdavSession.config);
+      const files = await refreshWebDAVFiles(webdavSession.config);
       const activeFile =
         webdavSession.activeFile?.path === file.path
           ? null
-          : webdavSession.activeFile;
-      setWebdavSession((current) => ({
-        ...current,
-        activeFile,
-        isCurrentSceneWebDAV: activeFile !== null,
-      }));
-      updateStoredWebDAVSession(activeFile?.path || null, webdavSession.config);
+          : files.find((item) => item.path === webdavSession.activeFile?.path) ||
+            webdavSession.activeFile;
+      if (!activeFile) {
+        clearWebDAVBinding(webdavSession.config);
+      } else {
+        applyWebDAVSyncedState(
+          activeFile,
+          lastSyncedWebDAVContentRef.current,
+          webdavSession.remoteDirty ? "draft" : "remote",
+        );
+      }
       excalidrawAPI?.setToast({
         message: t("webdav.toast.deleted"),
         duration: 1500,
@@ -902,7 +1068,7 @@ const ExcalidrawWrapper = () => {
     }
     hasRestoredWebDAVSessionRef.current = true;
 
-    const storedConfig = importWebDAVConfigFromLocalStorage();
+    const storedConfig = webdavRestoreSnapshotRef.current;
     if (!storedConfig) {
       return;
     }
@@ -913,6 +1079,35 @@ const ExcalidrawWrapper = () => {
       password: storedConfig.password,
     });
   }, [handleWebDAVLogin]);
+
+  useEffect(() => {
+    if (!excalidrawAPI || !webdavSession.loggedIn || !webdavSession.config) {
+      return;
+    }
+    const pendingPath = pendingWebDAVRestorePathRef.current;
+    if (!pendingPath) {
+      return;
+    }
+    if (!webdavSession.activeFile || webdavSession.activeFile.path !== pendingPath) {
+      return;
+    }
+    if (webdavSession.documentStatus !== "loading-remote") {
+      return;
+    }
+
+    pendingWebDAVRestorePathRef.current = null;
+    loadWebDAVFile(pendingPath, {
+      config: webdavSession.config,
+      skipDirtyConfirm: true,
+    });
+  }, [
+    excalidrawAPI,
+    loadWebDAVFile,
+    webdavSession.activeFile,
+    webdavSession.config,
+    webdavSession.documentStatus,
+    webdavSession.loggedIn,
+  ]);
 
   useEffect(() => {
     if (!excalidrawAPI) {
@@ -986,7 +1181,11 @@ const ExcalidrawWrapper = () => {
       }
     };
 
-    initializeScene({ collabAPI, excalidrawAPI }).then(async (data) => {
+    initializeScene({
+      collabAPI,
+      excalidrawAPI,
+      localDataState: getInitialLocalDataState(),
+    }).then(async (data) => {
       loadImages(data, /* isInitialLoad */ true);
       initialStatePromiseRef.current.promise.resolve(data.scene);
     });
@@ -1003,7 +1202,11 @@ const ExcalidrawWrapper = () => {
         }
         excalidrawAPI.updateScene({ appState: { isLoading: true } });
 
-        initializeScene({ collabAPI, excalidrawAPI }).then((data) => {
+        initializeScene({
+          collabAPI,
+          excalidrawAPI,
+          localDataState: getInitialLocalDataState(),
+        }).then((data) => {
           loadImages(data);
           if (data.scene) {
             excalidrawAPI.updateScene({
@@ -1113,7 +1316,7 @@ const ExcalidrawWrapper = () => {
       );
       clearTimeout(titleTimeout);
     };
-  }, [isCollabDisabled, collabAPI, excalidrawAPI, setLangCode]);
+  }, [getInitialLocalDataState, isCollabDisabled, collabAPI, excalidrawAPI, setLangCode]);
 
   useEffect(() => {
     const unloadHandler = (event: BeforeUnloadEvent) => {
@@ -1151,7 +1354,10 @@ const ExcalidrawWrapper = () => {
     );
 
     setWebdavSession((current) => {
-      if (ignoreNextWebDAVChangeRef.current) {
+      if (
+        ignoreNextWebDAVChangeRef.current ||
+        current.documentStatus === "loading-remote"
+      ) {
         ignoreNextWebDAVChangeRef.current = false;
         return current;
       }
@@ -1159,22 +1365,31 @@ const ExcalidrawWrapper = () => {
       if (
         !current.loggedIn ||
         current.isSaving ||
-        current.isLoadingFile ||
-        current.error
+        current.error ||
+        current.sceneSource !== "webdav" ||
+        !current.activeFile
       ) {
         return current;
       }
 
-      const isDirty =
+      const nextRemoteDirty =
         currentSerializedContent !== lastSyncedWebDAVContentRef.current;
 
-      if (current.remoteDirty === isDirty) {
+      if (current.remoteDirty === nextRemoteDirty) {
         return current;
       }
 
+      updateStoredWebDAVSession({
+        config: current.config,
+        activeFilePath: current.activeFile.path,
+        restoreMode: nextRemoteDirty ? "draft" : "remote",
+        lastSyncedContent: lastSyncedWebDAVContentRef.current,
+      });
+
       return {
         ...current,
-        remoteDirty: isDirty,
+        documentStatus: nextRemoteDirty ? "dirty" : "clean",
+        remoteDirty: nextRemoteDirty,
       };
     });
 
