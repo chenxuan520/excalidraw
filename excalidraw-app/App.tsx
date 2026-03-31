@@ -106,7 +106,6 @@ import {
   loginIcon,
   LibraryIcon,
   ExportIcon,
-  youtubeIcon,
 } from "../packages/excalidraw/components/icons";
 import { appThemeAtom, useHandleAppTheme } from "./useHandleAppTheme";
 import { getPreferredLanguage } from "./app-language/language-detector";
@@ -1671,20 +1670,6 @@ const ExcalidrawWrapper = () => {
               perform: () => {
                 window.open(
                   "https://github.com/chenxuan520/excalidraw",
-                  "_blank",
-                  "noopener noreferrer",
-                );
-              },
-            },
-            {
-              label: "YouTube",
-              icon: youtubeIcon,
-              category: DEFAULT_CATEGORIES.links,
-              predicate: true,
-              keywords: ["features", "tutorials", "howto", "help", "community"],
-              perform: () => {
-                window.open(
-                  "https://youtube.com/@excalidraw",
                   "_blank",
                   "noopener noreferrer",
                 );

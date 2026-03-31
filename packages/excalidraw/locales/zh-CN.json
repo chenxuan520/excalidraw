@@ -525,6 +525,21 @@
       }
     }
   },
+  "commandPalette": {
+    "title": "命令面板",
+    "shortcuts": {
+      "select": "选择",
+      "confirm": "确认",
+      "close": "关闭"
+    },
+    "recents": "最近使用",
+    "search": {
+      "placeholder": "搜索菜单、命令，并发现隐藏功能",
+      "noMatch": "没有匹配的命令..."
+    },
+    "itemNotAvailable": "命令不可用...",
+    "shortcutHint": "命令面板请使用 {{shortcut}}"
+  },
   "webdav": {
     "topRight": {
       "onlineMode": "在线模式",
