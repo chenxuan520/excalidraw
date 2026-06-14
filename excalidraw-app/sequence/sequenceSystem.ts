@@ -199,8 +199,12 @@ const synchronizeLane = (lane: SequenceLane) => {
     [0, 0],
     [0, targetHeight],
   ];
+  const shouldRefreshLifelineMeta =
+    lifelineMeta?.laneId !== lane.laneId ||
+    lifelineMeta?.topOffset !== topOffset;
 
   if (
+    shouldRefreshLifelineMeta ||
     Math.abs(lifeline.x - targetCenterX) > 0.5 ||
     Math.abs(lifeline.y - targetY) > 0.5 ||
     Math.abs(lifeline.height - targetHeight) > 0.5 ||
