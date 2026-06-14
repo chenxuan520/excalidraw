@@ -620,5 +620,80 @@
     "description": "目前仅支持<flowchartLink>流程图</flowchartLink>、<sequenceLink>序列图</sequenceLink>和<classLink>类图</classLink>。其他类型在 Excalidraw 中将以图像呈现。",
     "syntax": "Mermaid 语法",
     "preview": "预览"
+  },
+  "sequenceDiagram": {
+    "tab": "时序图",
+    "title": "时序图库",
+    "description": "把类似飞书画板的时序图图元直接插到画布里。插入后仍然是普通 Excalidraw 元素，可以继续拖拽、改字和组合。",
+    "footer": "提示：插入后你可以继续移动、改文案、重新组合、缩放，或者在这些图元上继续自由绘制。",
+    "menu": "时序图图元",
+    "sections": {
+      "templates": "模板",
+      "participants": "参与者",
+      "messages": "消息",
+      "helpers": "辅助图元"
+    },
+    "defaults": {
+      "actor": "角色",
+      "participant": "参与者",
+      "service": "服务",
+      "database": "数据库",
+      "request": "请求",
+      "response": "响应",
+      "self": "自调用",
+      "note": "备注",
+      "loop": "循环",
+      "alt": "分支"
+    },
+    "items": {
+      "blank": {
+        "label": "空白时序图",
+        "description": "内置 actor、service、database 三条泳道"
+      },
+      "actor": {
+        "label": "Actor",
+        "description": "带生命线的人物参与者"
+      },
+      "participant": {
+        "label": "参与者",
+        "description": "普通参与者框 + 生命线"
+      },
+      "service": {
+        "label": "服务",
+        "description": "圆角服务框 + 生命线"
+      },
+      "database": {
+        "label": "数据库",
+        "description": "数据库图元 + 生命线"
+      },
+      "message": {
+        "label": "同步消息",
+        "description": "实线调用箭头"
+      },
+      "return": {
+        "label": "返回消息",
+        "description": "虚线响应箭头"
+      },
+      "self": {
+        "label": "自调用",
+        "description": "回折调用箭头"
+      },
+      "activation": {
+        "label": "激活条",
+        "description": "执行区块"
+      },
+      "note": {
+        "label": "备注",
+        "description": "说明备注框"
+      },
+      "loop": {
+        "label": "Loop 片段",
+        "description": "虚线循环框"
+      },
+      "alt": {
+        "label": "Alt 片段",
+        "description": "虚线分支框"
+      }
+    }
   }
 }

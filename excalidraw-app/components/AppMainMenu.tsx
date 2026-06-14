@@ -8,6 +8,7 @@ import type { Theme } from "../../packages/excalidraw/element/types";
 import { useI18n } from "../../packages/excalidraw/i18n";
 import { MainMenu } from "../../packages/excalidraw/index";
 import { LanguageList } from "../app-language/LanguageList";
+import { SequenceDiagramMenuIcon } from "../sequence/SequenceDiagramSidebar";
 
 export const AppMainMenu: React.FC<{
   loggedIn: boolean;
@@ -16,6 +17,7 @@ export const AppMainMenu: React.FC<{
   setTheme: (theme: Theme | "system") => void;
   onOpenLogin: () => void;
   onOpenManager: () => void;
+  onOpenSequenceDiagram: () => void;
   onSave: () => void;
   onLogout: () => void;
 }> = React.memo((props) => {
@@ -46,6 +48,12 @@ export const AppMainMenu: React.FC<{
           </MainMenu.Item>
         </>
       )}
+      <MainMenu.Item
+        icon={SequenceDiagramMenuIcon}
+        onSelect={props.onOpenSequenceDiagram}
+      >
+        {t("sequenceDiagram.menu")}
+      </MainMenu.Item>
       <MainMenu.DefaultItems.Help />
       <MainMenu.DefaultItems.ClearCanvas />
       <MainMenu.DefaultItems.CommandPalette className="highlighted" />

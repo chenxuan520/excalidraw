@@ -111,6 +111,12 @@ import { appThemeAtom, useHandleAppTheme } from "./useHandleAppTheme";
 import { getPreferredLanguage } from "./app-language/language-detector";
 import { useAppLangCode } from "./app-language/language-state";
 import {
+  SequenceDiagramSidebar,
+  SequenceDiagramMenuIcon,
+} from "./sequence/SequenceDiagramSidebar";
+import { SEQUENCE_DIAGRAM_SIDEBAR_TAB } from "./sequence/sequenceStencils";
+import { synchronizeSequenceDiagramElements } from "./sequence/sequenceSystem";
+import {
   createEmptyExcalidrawContent,
   createWebDAVFile,
   deleteWebDAVFile,
@@ -379,6 +385,7 @@ const ExcalidrawWrapper = () => {
   const webdavRestoreSnapshotRef = useRef<WebDAVStoredSession | null>(
     importWebDAVConfigFromLocalStorage(),
   );
+  const isApplyingSequenceSyncRef = useRef(false);
 
   // initial state
   // ---------------------------------------------------------------------------
@@ -445,7 +452,9 @@ const ExcalidrawWrapper = () => {
   );
 
   const updateStoredWebDAVSession = useCallback(
-    (snapshot: Partial<WebDAVStoredSession> & { config?: WebDAVConfig | null }) => {
+    (
+      snapshot: Partial<WebDAVStoredSession> & { config?: WebDAVConfig | null },
+    ) => {
       const config = snapshot.config ?? webdavSession.config;
       if (!config) {
         return;
@@ -655,7 +664,12 @@ const ExcalidrawWrapper = () => {
           },
           "local",
         );
-        applyWebDAVSyncedState(activeFile, syncedContent, "remote", resolvedConfig);
+        applyWebDAVSyncedState(
+          activeFile,
+          syncedContent,
+          "remote",
+          resolvedConfig,
+        );
         excalidrawAPI.setToast({
           message: t("webdav.toast.loaded", { name: activeFile.name }),
           duration: 1500,
@@ -711,8 +725,11 @@ const ExcalidrawWrapper = () => {
         const nextActiveFile =
           files.find((file) => file.path === stored?.activeFilePath) || null;
         const restoreMode =
-          nextActiveFile && stored?.restoreMode === "draft" ? "draft" : "remote";
-        const isRemoteRestore = nextActiveFile !== null && restoreMode === "remote";
+          nextActiveFile && stored?.restoreMode === "draft"
+            ? "draft"
+            : "remote";
+        const isRemoteRestore =
+          nextActiveFile !== null && restoreMode === "remote";
         pendingWebDAVRestorePathRef.current = isRemoteRestore
           ? nextActiveFile?.path || null
           : null;
@@ -768,7 +785,13 @@ const ExcalidrawWrapper = () => {
         return null;
       }
     },
-    [excalidrawAPI, setWebDAVLoginOpen, setWebdavFiles, setWebdavSession, updateStoredWebDAVSession],
+    [
+      excalidrawAPI,
+      setWebDAVLoginOpen,
+      setWebdavFiles,
+      setWebdavSession,
+      updateStoredWebDAVSession,
+    ],
   );
 
   const handleWebDAVLogin = useCallback(
@@ -934,7 +957,11 @@ const ExcalidrawWrapper = () => {
       const files = await refreshWebDAVFiles(webdavSession.config);
       const activeFile = files.find((file) => file.path === remotePath) || null;
       pendingWebDAVRestorePathRef.current = null;
-      applyWebDAVSyncedState(activeFile, createEmptyExcalidrawContent(fileName), "remote");
+      applyWebDAVSyncedState(
+        activeFile,
+        createEmptyExcalidrawContent(fileName),
+        "remote",
+      );
       await loadWebDAVFile(remotePath, { skipDirtyConfirm: true });
     },
     [
@@ -997,7 +1024,11 @@ const ExcalidrawWrapper = () => {
       applyWebDAVSyncedState(
         activeFile,
         activeFile?.path ? lastSyncedWebDAVContentRef.current : null,
-        activeFile?.path ? (webdavSession.remoteDirty ? "draft" : "remote") : "remote",
+        activeFile?.path
+          ? webdavSession.remoteDirty
+            ? "draft"
+            : "remote"
+          : "remote",
       );
       excalidrawAPI?.setToast({
         message: t("webdav.toast.renamed"),
@@ -1035,8 +1066,9 @@ const ExcalidrawWrapper = () => {
       const activeFile =
         webdavSession.activeFile?.path === file.path
           ? null
-          : files.find((item) => item.path === webdavSession.activeFile?.path) ||
-            webdavSession.activeFile;
+          : files.find(
+              (item) => item.path === webdavSession.activeFile?.path,
+            ) || webdavSession.activeFile;
       if (!activeFile) {
         clearWebDAVBinding(webdavSession.config);
       } else {
@@ -1087,7 +1119,10 @@ const ExcalidrawWrapper = () => {
     if (!pendingPath) {
       return;
     }
-    if (!webdavSession.activeFile || webdavSession.activeFile.path !== pendingPath) {
+    if (
+      !webdavSession.activeFile ||
+      webdavSession.activeFile.path !== pendingPath
+    ) {
       return;
     }
     if (webdavSession.documentStatus !== "loading-remote") {
@@ -1315,7 +1350,13 @@ const ExcalidrawWrapper = () => {
       );
       clearTimeout(titleTimeout);
     };
-  }, [getInitialLocalDataState, isCollabDisabled, collabAPI, excalidrawAPI, setLangCode]);
+  }, [
+    getInitialLocalDataState,
+    isCollabDisabled,
+    collabAPI,
+    excalidrawAPI,
+    setLangCode,
+  ]);
 
   useEffect(() => {
     const unloadHandler = (event: BeforeUnloadEvent) => {
@@ -1341,6 +1382,22 @@ const ExcalidrawWrapper = () => {
     appState: AppState,
     files: BinaryFiles,
   ) => {
+    if (excalidrawAPI) {
+      if (isApplyingSequenceSyncRef.current) {
+        isApplyingSequenceSyncRef.current = false;
+      } else {
+        const synced = synchronizeSequenceDiagramElements(elements);
+        if (synced.changed) {
+          isApplyingSequenceSyncRef.current = true;
+          excalidrawAPI.updateScene({
+            elements: synced.elements,
+            storeAction: StoreAction.UPDATE,
+          });
+          return;
+        }
+      }
+    }
+
     if (collabAPI?.isCollaborating()) {
       collabAPI.syncElements(elements);
     }
@@ -1461,6 +1518,18 @@ const ExcalidrawWrapper = () => {
     ? ""
     : getCurrentSceneName(excalidrawAPI);
 
+  const openSequenceDiagramSidebar = () => {
+    excalidrawAPI?.updateScene({
+      appState: {
+        openSidebar: {
+          name: "default",
+          tab: SEQUENCE_DIAGRAM_SIDEBAR_TAB,
+        },
+      },
+      storeAction: StoreAction.NONE,
+    });
+  };
+
   return (
     <div
       style={{ height: "100%" }}
@@ -1510,6 +1579,7 @@ const ExcalidrawWrapper = () => {
           remoteDirty={webdavSession.remoteDirty}
           onOpenLogin={() => setWebDAVLoginOpen(true)}
           onOpenManager={() => setWebDAVFileManagerOpen(true)}
+          onOpenSequenceDiagram={openSequenceDiagramSidebar}
           onSave={() => saveCurrentSceneToWebDAV()}
           onLogout={handleWebDAVLogout}
           theme={appTheme}
@@ -1521,6 +1591,7 @@ const ExcalidrawWrapper = () => {
           <OverwriteConfirmDialog.Actions.SaveToDisk />
         </OverwriteConfirmDialog>
         <AppFooter />
+        <SequenceDiagramSidebar />
         <TTDDialog
           onTextSubmit={async (input) => {
             try {
@@ -1652,6 +1723,14 @@ const ExcalidrawWrapper = () => {
               icon: loginIcon,
               keywords: ["webdav", "logout", "disconnect"],
               perform: handleWebDAVLogout,
+            },
+            {
+              label: t("sequenceDiagram.menu"),
+              category: DEFAULT_CATEGORIES.tools,
+              icon: SequenceDiagramMenuIcon,
+              predicate: true,
+              keywords: ["sequence", "diagram", "uml", "时序图", "lifeline"],
+              perform: openSequenceDiagramSidebar,
             },
             {
               label: "GitHub",

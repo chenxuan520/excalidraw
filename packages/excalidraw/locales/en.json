@@ -569,6 +569,81 @@
     "syntax": "Mermaid Syntax",
     "preview": "Preview"
   },
+  "sequenceDiagram": {
+    "tab": "Sequence",
+    "title": "Sequence diagram shapes",
+    "description": "Insert Feishu-style sequence diagram stencils directly onto the canvas. Every stencil remains a normal Excalidraw element after insertion.",
+    "footer": "Tip: after insertion you can keep dragging, editing text, regrouping, resizing, or continue drawing on top of the stencil.",
+    "menu": "Sequence diagram shapes",
+    "sections": {
+      "templates": "Templates",
+      "participants": "Participants",
+      "messages": "Messages",
+      "helpers": "Helpers"
+    },
+    "defaults": {
+      "actor": "Actor",
+      "participant": "Participant",
+      "service": "Service",
+      "database": "Database",
+      "request": "request",
+      "response": "response",
+      "self": "self",
+      "note": "Note",
+      "loop": "loop",
+      "alt": "alt"
+    },
+    "items": {
+      "blank": {
+        "label": "Blank sequence",
+        "description": "Actor, service, and database lanes with lifelines"
+      },
+      "actor": {
+        "label": "Actor",
+        "description": "Stick figure participant with lifeline"
+      },
+      "participant": {
+        "label": "Participant",
+        "description": "Simple participant box with lifeline"
+      },
+      "service": {
+        "label": "Service",
+        "description": "Rounded service box with lifeline"
+      },
+      "database": {
+        "label": "Database",
+        "description": "Database participant with lifeline"
+      },
+      "message": {
+        "label": "Sync message",
+        "description": "Solid call arrow"
+      },
+      "return": {
+        "label": "Return message",
+        "description": "Dotted response arrow"
+      },
+      "self": {
+        "label": "Self message",
+        "description": "Loopback call arrow"
+      },
+      "activation": {
+        "label": "Activation",
+        "description": "Execution bar"
+      },
+      "note": {
+        "label": "Note",
+        "description": "Callout note box"
+      },
+      "loop": {
+        "label": "Loop fragment",
+        "description": "Dashed loop frame"
+      },
+      "alt": {
+        "label": "Alt fragment",
+        "description": "Dashed alternative frame"
+      }
+    }
+  },
   "quickSearch": {
     "placeholder": "Quick search"
   },
