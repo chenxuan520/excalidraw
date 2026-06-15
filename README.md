@@ -58,7 +58,8 @@
 5. 针对 WebDAV 场景补充了本地文件 / 云端文件区分、未保存提示、文件切换确认等交互
 6. 隐藏了 AI 相关入口（如 Text to Diagram、Magic Frame、AI 设置等）
 7. 移除了跟踪/统计相关代码
-8. release 中提供可直接使用的前端静态构建产物
+8. 新增时序图工具箱，支持飞书风格的参与者/消息/激活条/片段图元与联动编辑
+9. release 中提供可直接使用的前端静态构建产物
 
 # 开发与构建
 
@@ -149,4 +150,3 @@ Check out our [documentation](https://docs.excalidraw.com/docs/@excalidraw/excal
 ## Who's integrating Excalidraw
 
 [Google Cloud](https://googlecloudcheatsheet.withgoogle.com/architecture) • [Meta](https://meta.com/) • [CodeSandbox](https://codesandbox.io/) • [Obsidian Excalidraw](https://github.com/zsviczian/obsidian-excalidraw-plugin) • [Replit](https://replit.com/) • [Slite](https://slite.com/) • [Notion](https://notion.so/) • [HackerRank](https://www.hackerrank.com/) • and many others
-
