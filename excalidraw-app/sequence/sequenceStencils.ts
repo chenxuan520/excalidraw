@@ -1,7 +1,6 @@
 import {
   FONT_FAMILY,
   ROUNDNESS,
-  THEME,
 } from "../../packages/excalidraw/constants";
 import type { ExcalidrawElementSkeleton } from "../../packages/excalidraw/data/transform";
 import { getLineHeight } from "../../packages/excalidraw/fonts";
@@ -99,7 +98,7 @@ export const sequenceStencilSections: {
   { key: "templates", items: ["blank"] },
   {
     key: "participants",
-    items: ["actor", "participant", "service", "database", "mq"],
+    items: ["actor", "service", "participant", "database", "mq"],
   },
   { key: "messages", items: ["message", "return", "self"] },
   { key: "helpers", items: ["activation", "note", "loop", "alt"] },
@@ -109,6 +108,8 @@ type Palette = {
   stroke: string;
   mutedStroke: string;
   text: string;
+  surfaceStroke: string;
+  surfaceText: string;
   boxFill: string;
   accentFill: string;
   activationFill: string;
@@ -120,7 +121,7 @@ type Palette = {
 export const SEQUENCE_PARTICIPANT_HEIGHT = 48;
 const LIFELINE_HEIGHT = 340;
 export const SEQUENCE_TEXT_FONT_SIZE = 16;
-const FONT = FONT_FAMILY.Yutong;
+const FONT = FONT_FAMILY["Comic Shanns"];
 export const SEQUENCE_TEXT_LINE_HEIGHT = getLineHeight(FONT);
 export const SEQUENCE_TEXT_FONT_FAMILY = FONT;
 const DEFAULT_FONT = getFontString({
@@ -131,25 +132,13 @@ export const SEQUENCE_FRAGMENT_HEADER_HEIGHT = 28;
 export const SEQUENCE_SELF_CALL_HEIGHT = 54;
 const SEQUENCE_FRAGMENT_HEADER_PADDING_X = 12;
 
-const getPalette = (theme: Theme): Palette => {
-  if (theme === THEME.DARK) {
-    return {
-      stroke: "#e5e7eb",
-      mutedStroke: "#98a2b3",
-      text: "#f8fafc",
-      boxFill: "#2b2f3a",
-      accentFill: "#31384b",
-      activationFill: "#46506b",
-      noteFill: "#5c4a12",
-      noteStroke: "#facc15",
-      fragmentStroke: "#cbd5e1",
-    };
-  }
-
+const getPalette = (_theme: Theme): Palette => {
   return {
     stroke: "#2f3441",
     mutedStroke: "#98a2b3",
     text: "#1f2328",
+    surfaceStroke: "#2f3441",
+    surfaceText: "#1f2328",
     boxFill: "#ffffff",
     accentFill: "#eef3ff",
     activationFill: "#e8eefc",
@@ -301,7 +290,7 @@ const makeTextStyle = (palette: Palette) => ({
 
 const makeCenteredLabel = (label: string, palette: Palette) => ({
   text: label,
-  ...makeTextStyle(palette),
+  ...makeTextStyle({ ...palette, text: palette.surfaceText }),
   textAlign: "center" as const,
   verticalAlign: "middle" as const,
 });
@@ -316,6 +305,7 @@ const createCenteredText = ({
   palette,
   groupId,
   customData,
+  textColor,
 }: {
   id?: string;
   x: number;
@@ -326,6 +316,7 @@ const createCenteredText = ({
   palette: Palette;
   groupId: string;
   customData?: SequenceElementMeta;
+  textColor?: string;
 }) => {
   const metrics = measureText(label, DEFAULT_FONT, SEQUENCE_TEXT_LINE_HEIGHT);
 
@@ -335,7 +326,7 @@ const createCenteredText = ({
     x: x + Math.max((width - metrics.width) / 2, 0),
     y: y + Math.max((height - metrics.height) / 2, 0),
     text: label,
-    ...makeTextStyle(palette),
+    ...makeTextStyle({ ...palette, text: textColor ?? palette.text }),
     groupIds: [groupId],
     ...(customData ? { customData } : null),
   } as ExcalidrawElementSkeleton;
@@ -388,7 +379,7 @@ const createParticipant = (
       y: 0,
       width,
       height: SEQUENCE_PARTICIPANT_HEIGHT,
-      strokeColor: palette.stroke,
+      strokeColor: palette.surfaceStroke,
       strokeWidth: 2,
       fillStyle: "solid",
       backgroundColor: fill,
@@ -428,7 +419,7 @@ const createActor = (
       y: 0,
       width: 28,
       height: 28,
-      strokeColor: palette.stroke,
+      strokeColor: palette.surfaceStroke,
       backgroundColor: "transparent",
       fillStyle: "solid",
       strokeWidth: 2,
@@ -446,7 +437,7 @@ const createActor = (
         [0, 0],
         [0, 26],
       ],
-      strokeColor: palette.stroke,
+      strokeColor: palette.surfaceStroke,
       strokeWidth: 2,
       roughness: 0,
       groupIds: [groupId],
@@ -461,7 +452,7 @@ const createActor = (
         [0, 0],
         [32, 0],
       ],
-      strokeColor: palette.stroke,
+      strokeColor: palette.surfaceStroke,
       strokeWidth: 2,
       roughness: 0,
       groupIds: [groupId],
@@ -476,7 +467,7 @@ const createActor = (
         [14, 0],
         [0, 18],
       ],
-      strokeColor: palette.stroke,
+      strokeColor: palette.surfaceStroke,
       strokeWidth: 2,
       roughness: 0,
       groupIds: [groupId],
@@ -491,7 +482,7 @@ const createActor = (
         [0, 0],
         [14, 18],
       ],
-      strokeColor: palette.stroke,
+      strokeColor: palette.surfaceStroke,
       strokeWidth: 2,
       roughness: 0,
       groupIds: [groupId],
@@ -503,6 +494,7 @@ const createActor = (
       height: 28,
       label,
       palette,
+      textColor: palette.surfaceText,
       groupId,
     }),
     createLifeline(laneId, groupId, x + 48, 108, palette),
@@ -545,7 +537,7 @@ const createDatabase = (
       y: 0,
       width,
       height: 28,
-      strokeColor: palette.stroke,
+      strokeColor: palette.surfaceStroke,
       strokeWidth: 2,
       fillStyle: "solid",
       backgroundColor: palette.accentFill,
@@ -562,7 +554,7 @@ const createDatabase = (
         [0, 0],
         [0, bodyHeight],
       ],
-      strokeColor: palette.stroke,
+      strokeColor: palette.surfaceStroke,
       strokeWidth: 2,
       roughness: 0,
       groupIds: [groupId],
@@ -577,7 +569,7 @@ const createDatabase = (
         [0, 0],
         [0, bodyHeight],
       ],
-      strokeColor: palette.stroke,
+      strokeColor: palette.surfaceStroke,
       strokeWidth: 2,
       roughness: 0,
       groupIds: [groupId],
@@ -588,7 +580,7 @@ const createDatabase = (
       y: bodyY + bodyHeight - 14,
       width,
       height: 28,
-      strokeColor: palette.stroke,
+      strokeColor: palette.surfaceStroke,
       strokeWidth: 2,
       fillStyle: "solid",
       backgroundColor: palette.accentFill,
@@ -637,7 +629,7 @@ const createMq = (
       y: 0,
       width: capWidth,
       height: SEQUENCE_PARTICIPANT_HEIGHT,
-      strokeColor: palette.stroke,
+      strokeColor: palette.surfaceStroke,
       strokeWidth: 2,
       fillStyle: "solid",
       backgroundColor: palette.accentFill,
@@ -650,7 +642,7 @@ const createMq = (
       y: 0,
       width: capWidth,
       height: SEQUENCE_PARTICIPANT_HEIGHT,
-      strokeColor: palette.stroke,
+      strokeColor: palette.surfaceStroke,
       strokeWidth: 2,
       fillStyle: "solid",
       backgroundColor: palette.accentFill,
@@ -667,7 +659,7 @@ const createMq = (
         [0, 0],
         [bodyWidth, 0],
       ],
-      strokeColor: palette.stroke,
+      strokeColor: palette.surfaceStroke,
       strokeWidth: 2,
       roughness: 0,
       groupIds: [groupId],
@@ -682,7 +674,7 @@ const createMq = (
         [0, 0],
         [bodyWidth, 0],
       ],
-      strokeColor: palette.stroke,
+      strokeColor: palette.surfaceStroke,
       strokeWidth: 2,
       roughness: 0,
       groupIds: [groupId],
@@ -754,7 +746,7 @@ const createActivation = (palette: Palette) => {
       y: 0,
       width: 18,
       height: 140,
-      strokeColor: palette.stroke,
+      strokeColor: palette.surfaceStroke,
       strokeWidth: 2,
       backgroundColor: palette.activationFill,
       fillStyle: "solid",
@@ -788,7 +780,7 @@ export const createSequenceActivationStencil = ({
       y,
       width: 18,
       height: activationHeight,
-      strokeColor: palette.stroke,
+      strokeColor: palette.surfaceStroke,
       strokeWidth: 2,
       backgroundColor: palette.activationFill,
       fillStyle: "solid",
@@ -882,7 +874,7 @@ const createFragment = (
       y: 0,
       width: headerWidth,
       height: SEQUENCE_FRAGMENT_HEADER_HEIGHT,
-      strokeColor: palette.fragmentStroke,
+      strokeColor: palette.surfaceStroke,
       strokeWidth: 2,
       backgroundColor: palette.accentFill,
       fillStyle: "solid",
@@ -902,6 +894,7 @@ const createFragment = (
       label,
       palette,
       groupId: fragmentGroupId,
+      textColor: palette.surfaceText,
       customData: createSequenceMeta("fragment", undefined, {
         variant: kind,
         part: "label",
