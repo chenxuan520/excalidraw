@@ -45,7 +45,11 @@ import {
 import { tupleToCoors } from "../utils";
 import { isBindingElement } from "./typeChecks";
 import { KEYS, shouldRotateWithDiscreteAngle } from "../keys";
-import { getBoundTextElement, handleBindTextResize } from "./textElement";
+import {
+  getArrowBoundTextOffset,
+  getBoundTextElement,
+  handleBindTextResize,
+} from "./textElement";
 import { DRAGGING_THRESHOLD } from "../constants";
 import type { Mutable } from "../utility-types";
 import { ShapeCache } from "../scene/ShapeCache";
@@ -1388,7 +1392,8 @@ export class LinearElementEditor {
       x = midSegmentMidpoint[0] - boundTextElement.width / 2;
       y = midSegmentMidpoint[1] - boundTextElement.height / 2;
     }
-    return { x, y };
+    const offset = getArrowBoundTextOffset(boundTextElement);
+    return { x: x + offset.x, y: y + offset.y };
   };
 
   static getMinMaxXYWithBoundText = (

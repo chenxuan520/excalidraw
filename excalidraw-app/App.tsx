@@ -114,7 +114,14 @@ import {
   SequenceDiagramSidebar,
   SequenceDiagramMenuIcon,
 } from "./sequence/SequenceDiagramSidebar";
-import { SEQUENCE_DIAGRAM_SIDEBAR_TAB } from "./sequence/sequenceStencils";
+import { SequenceActivationHandles } from "./sequence/SequenceActivationHandles";
+import { SequenceFragmentHandles } from "./sequence/SequenceFragmentHandles";
+import { SequenceParticipantAlignmentGuides } from "./sequence/SequenceParticipantAlignmentGuides";
+import {
+  DEFAULT_SEQUENCE_REQUEST_DIRECTION,
+  SEQUENCE_DIAGRAM_SIDEBAR_TAB,
+  type SequenceRequestDirection,
+} from "./sequence/sequenceStencils";
 import { synchronizeSequenceDiagramElements } from "./sequence/sequenceSystem";
 import {
   createEmptyExcalidrawContent,
@@ -361,6 +368,13 @@ const initializeScene = async (opts: {
 };
 
 const ExcalidrawWrapper = () => {
+  const [sequenceRequestDirection, setSequenceRequestDirection] =
+    useState<SequenceRequestDirection>(() => {
+      const stored = window.localStorage.getItem("sequence-request-direction");
+      return stored === "rtl"
+        ? "rtl"
+        : DEFAULT_SEQUENCE_REQUEST_DIRECTION;
+    });
   const [errorMessage, setErrorMessage] = useState("");
   const isCollabDisabled = isRunningInIframe();
 
@@ -386,6 +400,10 @@ const ExcalidrawWrapper = () => {
     importWebDAVConfigFromLocalStorage(),
   );
   const isApplyingSequenceSyncRef = useRef(false);
+  const sequenceResizeHandleTypeRef = useRef<string | boolean | null>(null);
+  const sequenceResizeOriginalElementsRef = useRef<Map<string, any> | null>(
+    null,
+  );
 
   // initial state
   // ---------------------------------------------------------------------------
@@ -410,6 +428,13 @@ const ExcalidrawWrapper = () => {
     useCallbackRefState<ExcalidrawImperativeAPI>();
 
   useMathSubtype(excalidrawAPI);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      "sequence-request-direction",
+      sequenceRequestDirection,
+    );
+  }, [sequenceRequestDirection]);
 
   const [collabAPI] = useAtom(collabAPIAtom);
 
@@ -1377,6 +1402,64 @@ const ExcalidrawWrapper = () => {
     };
   }, [excalidrawAPI]);
 
+  const applySequenceSync = useCallback(
+    (
+      nextElements: readonly OrderedExcalidrawElement[],
+      selectedElementIds: AppState["selectedElementIds"],
+      storeAction?: "update",
+      resizeHandleType?: string | boolean | null,
+    ) => {
+      if (!excalidrawAPI) {
+        return false;
+      }
+
+      const synced = synchronizeSequenceDiagramElements(
+        nextElements,
+        selectedElementIds,
+        {
+          resizeHandleType,
+          originalElements: sequenceResizeOriginalElementsRef.current,
+        },
+      );
+      if (!synced.changed) {
+        return false;
+      }
+
+      isApplyingSequenceSyncRef.current = true;
+      excalidrawAPI.updateScene(
+        storeAction
+          ? { elements: synced.elements, storeAction }
+          : { elements: synced.elements },
+      );
+      return true;
+    },
+    [excalidrawAPI],
+  );
+
+  useEffect(() => {
+    if (!excalidrawAPI) {
+      return;
+    }
+
+    let cancelled = false;
+
+    initialStatePromiseRef.current.promise.then(() => {
+      if (cancelled || !excalidrawAPI) {
+        return;
+      }
+
+      applySequenceSync(
+        excalidrawAPI.getSceneElementsIncludingDeleted() as readonly OrderedExcalidrawElement[],
+        excalidrawAPI.getAppState().selectedElementIds,
+        StoreAction.UPDATE,
+      );
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [applySequenceSync, excalidrawAPI]);
+
   const onChange = (
     elements: readonly OrderedExcalidrawElement[],
     appState: AppState,
@@ -1385,16 +1468,15 @@ const ExcalidrawWrapper = () => {
     if (excalidrawAPI) {
       if (isApplyingSequenceSyncRef.current) {
         isApplyingSequenceSyncRef.current = false;
-      } else {
-        const synced = synchronizeSequenceDiagramElements(elements);
-        if (synced.changed) {
-          isApplyingSequenceSyncRef.current = true;
-          excalidrawAPI.updateScene({
-            elements: synced.elements,
-            storeAction: StoreAction.UPDATE,
-          });
-          return;
-        }
+      } else if (
+        applySequenceSync(
+          elements,
+          appState.selectedElementIds,
+          StoreAction.UPDATE,
+          appState.isResizing ? sequenceResizeHandleTypeRef.current : null,
+        )
+      ) {
+        return;
       }
     }
 
@@ -1482,6 +1564,38 @@ const ExcalidrawWrapper = () => {
     }
   };
 
+  const onPointerUpAfterFinalize = (
+    _activeTool: AppState["activeTool"],
+    pointerDownState: Parameters<
+      NonNullable<
+        NonNullable<React.ComponentProps<typeof Excalidraw>["onPointerUpAfterFinalize"]>
+      >
+    >[1],
+  ) => {
+    if (!excalidrawAPI || isApplyingSequenceSyncRef.current) {
+      return;
+    }
+
+    const elements =
+      excalidrawAPI.getSceneElementsIncludingDeleted() as readonly OrderedExcalidrawElement[];
+    const selectedElementIds = excalidrawAPI.getAppState().selectedElementIds;
+    const synced = synchronizeSequenceDiagramElements(
+      elements,
+      selectedElementIds,
+      { resizeHandleType: pointerDownState.resize.handleType },
+    );
+    if (!synced.changed) {
+      sequenceResizeHandleTypeRef.current = null;
+      sequenceResizeOriginalElementsRef.current = null;
+      return;
+    }
+
+    isApplyingSequenceSyncRef.current = true;
+    sequenceResizeHandleTypeRef.current = null;
+    sequenceResizeOriginalElementsRef.current = null;
+    excalidrawAPI.updateScene({ elements: synced.elements });
+  };
+
   const renderCustomStats = (
     elements: readonly NonDeletedExcalidrawElement[],
     appState: UIAppState,
@@ -1541,6 +1655,13 @@ const ExcalidrawWrapper = () => {
         excalidrawAPI={excalidrawRefCallback}
         aiEnabled={false}
         onChange={onChange}
+        onPointerDown={(_activeTool, pointerDownState) => {
+          sequenceResizeHandleTypeRef.current =
+            pointerDownState.resize.handleType;
+          sequenceResizeOriginalElementsRef.current =
+            pointerDownState.originalElements;
+        }}
+        onPointerUpAfterFinalize={onPointerUpAfterFinalize}
         initialData={initialStatePromiseRef.current.promise}
         isCollaborating={isCollaborating}
         onPointerUpdate={collabAPI?.onPointerUpdate}
@@ -1591,7 +1712,15 @@ const ExcalidrawWrapper = () => {
           <OverwriteConfirmDialog.Actions.SaveToDisk />
         </OverwriteConfirmDialog>
         <AppFooter />
-        <SequenceDiagramSidebar />
+        <SequenceDiagramSidebar
+          requestDirection={sequenceRequestDirection}
+          onRequestDirectionChange={setSequenceRequestDirection}
+        />
+        <SequenceActivationHandles
+          requestDirection={sequenceRequestDirection}
+        />
+        <SequenceFragmentHandles />
+        <SequenceParticipantAlignmentGuides />
         <TTDDialog
           onTextSubmit={async (input) => {
             try {

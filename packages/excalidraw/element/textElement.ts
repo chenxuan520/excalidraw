@@ -64,6 +64,16 @@ export const normalizeText = (text: string) => {
   );
 };
 
+export const getArrowBoundTextOffset = (
+  boundTextElement: Pick<ExcalidrawElement, "customData">,
+) => {
+  const offset = boundTextElement.customData?.boundTextOffset;
+  return {
+    x: typeof offset?.x === "number" ? offset.x : 0,
+    y: typeof offset?.y === "number" ? offset.y : 0,
+  };
+};
+
 const splitIntoLines = (text: string) => {
   return normalizeText(text).split("\n");
 };

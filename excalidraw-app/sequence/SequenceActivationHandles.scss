@@ -1,0 +1,64 @@
+.excalidraw {
+  .sequence-activation-handles {
+    position: absolute;
+    inset: 0;
+    z-index: var(--zIndex-layerUI);
+    pointer-events: none;
+  }
+
+  .sequence-activation-handles__preview {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+
+    path {
+      fill: none;
+      stroke: var(--color-primary);
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.14));
+    }
+
+    .sequence-activation-handles__ghost-activation {
+      fill: color-mix(in srgb, var(--color-primary) 18%, transparent);
+      stroke: color-mix(in srgb, var(--color-primary) 52%, transparent);
+      stroke-width: 2;
+      stroke-dasharray: 4 3;
+    }
+  }
+
+  .sequence-activation-handles__handle {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    border: 1px solid color-mix(in srgb, var(--color-primary) 44%, white);
+    border-radius: 999px;
+    background: var(--island-bg-color);
+    color: var(--color-primary);
+    box-shadow: 0 6px 16px rgb(15 23 42 / 0.16);
+    transform: translate(-50%, -50%);
+    cursor: crosshair;
+    pointer-events: auto;
+
+    &:hover {
+      background: color-mix(
+        in srgb,
+        var(--color-primary) 10%,
+        var(--island-bg-color)
+      );
+    }
+
+    svg {
+      width: 0.95rem;
+      height: 0.95rem;
+    }
+  }
+}

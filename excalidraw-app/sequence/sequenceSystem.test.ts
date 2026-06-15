@@ -1,11 +1,27 @@
 import { convertToExcalidrawElements } from "../../packages/excalidraw";
-import type { OrderedExcalidrawElement } from "../../packages/excalidraw/element/types";
+import type { ExcalidrawElementSkeleton } from "../../packages/excalidraw/data/transform";
+import { newElementWith } from "../../packages/excalidraw/element/mutateElement";
+import type {
+  ExcalidrawElement,
+  ExcalidrawLinearElement,
+  ExcalidrawTextElement,
+  OrderedExcalidrawElement,
+} from "../../packages/excalidraw/element/types";
 import {
+  SEQUENCE_FRAGMENT_HEADER_HEIGHT,
+  SEQUENCE_PARTICIPANT_HEIGHT,
+  SEQUENCE_SELF_CALL_HEIGHT,
+  SEQUENCE_TEXT_FONT_SIZE,
+  SEQUENCE_TEXT_LINE_HEIGHT,
   createSequenceActivationStencil,
   createSequenceStencil,
   getSequenceLaneId,
+  getSequenceMessageLaneIds,
   isSequenceActivationElement,
+  isSequenceFragmentElement,
   isSequenceLifelineElement,
+  isSequenceMessageElement,
+  isSequenceNoteElement,
   type SequenceStencilDefaults,
 } from "./sequenceStencils";
 import { synchronizeSequenceDiagramElements } from "./sequenceSystem";
@@ -15,6 +31,7 @@ const defaults: SequenceStencilDefaults = {
   participant: "参与者",
   service: "服务",
   database: "数据库",
+  mq: "消息队列",
   request: "请求",
   response: "响应",
   self: "自调用",
@@ -112,6 +129,156 @@ describe("synchronizeSequenceDiagramElements", () => {
     );
   });
 
+  it("keeps a bound activation attached when the lane moves", () => {
+    const laneElements = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+
+    const lifeline = laneElements.find((element) =>
+      isSequenceLifelineElement(element),
+    )!;
+    const activation = convertToExcalidrawElements(
+      createSequenceActivationStencil({
+        centerX: lifeline.x,
+        y: lifeline.y + 48,
+        height: 120,
+        theme: "light",
+        laneId: getSequenceLaneId(lifeline),
+      }),
+      { regenerateIds: false },
+    )[0] as OrderedExcalidrawElement;
+
+    const firstSync = synchronizeSequenceDiagramElements([
+      ...laneElements,
+      activation,
+    ]);
+    const syncedLifeline = firstSync.elements.find((element) =>
+      isSequenceLifelineElement(element),
+    )!;
+    const syncedActivation = firstSync.elements.find((element) =>
+      isSequenceActivationElement(element),
+    )!;
+
+    const movedLane = firstSync.elements.map((element) => {
+      if (
+        element.id === syncedLifeline.id ||
+        element.id.startsWith("sequence-participant-")
+      ) {
+        return { ...element, x: element.x + 140 } as OrderedExcalidrawElement;
+      }
+      return element;
+    });
+
+    const secondSync = synchronizeSequenceDiagramElements(movedLane);
+    const movedLifeline = secondSync.elements.find((element) =>
+      isSequenceLifelineElement(element),
+    )!;
+    const movedActivation = secondSync.elements.find((element) =>
+      isSequenceActivationElement(element),
+    )!;
+
+    expect(getSequenceLaneId(movedActivation)).toBe(
+      getSequenceLaneId(movedLifeline),
+    );
+    expect(movedActivation.x + movedActivation.width / 2).toBe(movedLifeline.x);
+    expect(movedActivation.x).not.toBe(syncedActivation.x);
+  });
+
+  it("does not resync an already-synchronized activation on a no-op pass", () => {
+    const laneElements = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+
+    const lifeline = laneElements.find((element) =>
+      isSequenceLifelineElement(element),
+    )!;
+    const activation = convertToExcalidrawElements(
+      createSequenceActivationStencil({
+        centerX: lifeline.x,
+        y: lifeline.y + 48,
+        height: 120,
+        theme: "light",
+        laneId: getSequenceLaneId(lifeline),
+      }),
+      { regenerateIds: false },
+    )[0] as OrderedExcalidrawElement;
+
+    const firstSync = synchronizeSequenceDiagramElements([
+      ...laneElements,
+      activation,
+    ]);
+    const secondSync = synchronizeSequenceDiagramElements(firstSync.elements);
+
+    expect(firstSync.changed).toBe(true);
+    expect(secondSync.changed).toBe(false);
+  });
+
+  it("keeps a selected activation bar attached to its current lane when dragged horizontally", () => {
+    const leftLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+    const rightLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ).map((element) => ({
+      ...element,
+      x: element.x + 320,
+    })) as OrderedExcalidrawElement[];
+    const leftLifeline = leftLane.find((element) =>
+      isSequenceLifelineElement(element),
+    )!;
+    const activation = convertToExcalidrawElements(
+      createSequenceActivationStencil({
+        centerX: leftLifeline.x,
+        y: leftLifeline.y + 48,
+        height: 120,
+        theme: "light",
+        laneId: getSequenceLaneId(leftLifeline),
+      }),
+      { regenerateIds: false },
+    )[0] as OrderedExcalidrawElement;
+
+    const firstSync = synchronizeSequenceDiagramElements([
+      ...leftLane,
+      ...rightLane,
+      activation,
+    ]);
+    const rightLifeline = firstSync.elements
+      .filter((element) => isSequenceLifelineElement(element))
+      .sort((a, b) => a.x - b.x)[1];
+    const syncedActivation = firstSync.elements.find((element) =>
+      isSequenceActivationElement(element),
+    )!;
+
+    const movedActivation = {
+      ...syncedActivation,
+      x: rightLifeline.x - syncedActivation.width / 2,
+    } as OrderedExcalidrawElement;
+
+    const secondSync = synchronizeSequenceDiagramElements(
+      firstSync.elements.map((element) =>
+        element.id === movedActivation.id ? movedActivation : element,
+      ),
+      { [movedActivation.id]: true },
+    );
+    const reboundActivation = secondSync.elements.find((element) =>
+      isSequenceActivationElement(element),
+    )!;
+    const reboundLifeline = secondSync.elements.find((element) =>
+      isSequenceLifelineElement(element),
+    )!;
+
+    expect(getSequenceLaneId(reboundActivation)).toBe(
+      getSequenceLaneId(reboundLifeline),
+    );
+    expect(reboundActivation.x + reboundActivation.width / 2).toBe(
+      reboundLifeline.x,
+    );
+  });
+
   it("keeps duplicated lanes independent even if their source lane ids match", () => {
     const firstLane = convertToExcalidrawElements(
       createSequenceStencil("participant", "light", defaults),
@@ -137,6 +304,985 @@ describe("synchronizeSequenceDiagramElements", () => {
     expect(participants.length).toBeGreaterThanOrEqual(2);
     expect(getSequenceLaneId(participants[0])).not.toBe(
       getSequenceLaneId(participants[1]),
+    );
+  });
+
+  it("snaps message arrows to lanes and follows participant movement", () => {
+    const leftLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+    const rightLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ).map((element) => ({
+      ...element,
+      x: element.x + 320,
+    })) as OrderedExcalidrawElement[];
+    const message = convertToExcalidrawElements(
+      createSequenceStencil("message", "light", defaults),
+      { regenerateIds: false },
+    )[0] as OrderedExcalidrawElement;
+
+    const shiftedMessage = {
+      ...message,
+      x: 80,
+      y: 120,
+    } as OrderedExcalidrawElement;
+
+    const firstSync = synchronizeSequenceDiagramElements([
+      ...leftLane,
+      ...rightLane,
+      shiftedMessage,
+    ]);
+
+    const syncedMessage = firstSync.elements.find((element) =>
+      isSequenceMessageElement(element),
+    )! as OrderedExcalidrawElement & ExcalidrawLinearElement;
+    const lifelines = firstSync.elements.filter((element) =>
+      isSequenceLifelineElement(element),
+    );
+    const sortedLifelines = [...lifelines].sort((a, b) => a.x - b.x);
+
+    expect(syncedMessage.points.length).toBe(2);
+    expect(syncedMessage.x).toBe(sortedLifelines[0].x);
+    expect(syncedMessage.points[1][0]).toBe(
+      sortedLifelines[1].x - sortedLifelines[0].x,
+    );
+
+    const movedRightLane = firstSync.elements.map((element) =>
+      getSequenceLaneId(element) === getSequenceLaneId(sortedLifelines[1])
+        ? ({ ...element, x: element.x + 120 } as OrderedExcalidrawElement)
+        : element,
+    );
+
+    const secondSync = synchronizeSequenceDiagramElements(movedRightLane);
+    const movedMessage = secondSync.elements.find((element) =>
+      isSequenceMessageElement(element),
+    )! as OrderedExcalidrawElement & ExcalidrawLinearElement;
+    const movedLifelines = secondSync.elements
+      .filter((element) => isSequenceLifelineElement(element))
+      .sort((a, b) => a.x - b.x);
+
+    expect(movedMessage.x).toBe(movedLifelines[0].x);
+    expect(movedMessage.points[1][0]).toBe(
+      movedLifelines[1].x - movedLifelines[0].x,
+    );
+  });
+
+  it("rebinds a selected message when it is dragged to a different lane pair", () => {
+    const leftLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+    const middleLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ).map((element) => ({
+      ...element,
+      x: element.x + 320,
+    })) as OrderedExcalidrawElement[];
+    const rightLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ).map((element) => ({
+      ...element,
+      x: element.x + 640,
+    })) as OrderedExcalidrawElement[];
+    const message = convertToExcalidrawElements(
+      createSequenceStencil("message", "light", defaults),
+      { regenerateIds: false },
+    )[0] as OrderedExcalidrawElement;
+
+    const firstSync = synchronizeSequenceDiagramElements([
+      ...leftLane,
+      ...middleLane,
+      ...rightLane,
+      { ...message, x: 80, y: 120 } as OrderedExcalidrawElement,
+    ]);
+    const syncedMessage = firstSync.elements.find((element) =>
+      isSequenceMessageElement(element),
+    )! as OrderedExcalidrawElement & ExcalidrawLinearElement;
+    const lifelines = firstSync.elements
+      .filter((element) => isSequenceLifelineElement(element))
+      .sort((a, b) => a.x - b.x);
+
+    const movedMessage = {
+      ...syncedMessage,
+      x: lifelines[1].x,
+      points: [
+        [0, 0],
+        [lifelines[2].x - lifelines[1].x, 0],
+      ],
+    } as OrderedExcalidrawElement;
+
+    const secondSync = synchronizeSequenceDiagramElements(
+      firstSync.elements.map((element) =>
+        element.id === movedMessage.id ? movedMessage : element,
+      ),
+      { [movedMessage.id]: true },
+    );
+    const reboundMessage = secondSync.elements.find((element) =>
+      isSequenceMessageElement(element),
+    )!;
+
+    expect(getSequenceMessageLaneIds(reboundMessage)).toEqual({
+      fromLaneId: getSequenceLaneId(lifelines[1]),
+      toLaneId: getSequenceLaneId(lifelines[2]),
+    });
+  });
+
+  it("keeps return messages reversed by default", () => {
+    const leftLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+    const rightLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ).map((element) => ({
+      ...element,
+      x: element.x + 320,
+    })) as OrderedExcalidrawElement[];
+    const response = convertToExcalidrawElements(
+      createSequenceStencil("return", "light", defaults),
+      { regenerateIds: false },
+    )[0] as OrderedExcalidrawElement;
+
+    const synced = synchronizeSequenceDiagramElements([
+      ...leftLane,
+      ...rightLane,
+      { ...response, x: 80, y: 120 } as OrderedExcalidrawElement,
+    ]);
+    const syncedResponse = synced.elements.find((element) =>
+      isSequenceMessageElement(element),
+    )! as OrderedExcalidrawElement & ExcalidrawLinearElement;
+    const lifelines = synced.elements
+      .filter((element) => isSequenceLifelineElement(element))
+      .sort((a, b) => a.x - b.x);
+
+    expect(getSequenceMessageLaneIds(syncedResponse)).toEqual({
+      fromLaneId: getSequenceLaneId(lifelines[1]),
+      toLaneId: getSequenceLaneId(lifelines[0]),
+    });
+    expect(syncedResponse.x).toBe(lifelines[1].x);
+    expect(syncedResponse.points[1][0]).toBe(lifelines[0].x - lifelines[1].x);
+  });
+
+  it("connects messages to activation bar edges when activation ids are present", () => {
+    const leftLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+    const rightLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ).map((element) => ({
+      ...element,
+      x: element.x + 320,
+    })) as OrderedExcalidrawElement[];
+    const leftLifeline = leftLane.find((element) =>
+      isSequenceLifelineElement(element),
+    )!;
+    const rightLifeline = rightLane.find((element) =>
+      isSequenceLifelineElement(element),
+    )!;
+    const leftActivation = convertToExcalidrawElements(
+      createSequenceActivationStencil({
+        centerX: leftLifeline.x,
+        y: 120,
+        height: 88,
+        theme: "light",
+        laneId: getSequenceLaneId(leftLifeline),
+      }),
+      { regenerateIds: false },
+    )[0] as OrderedExcalidrawElement;
+    const rightActivation = convertToExcalidrawElements(
+      createSequenceActivationStencil({
+        centerX: rightLifeline.x,
+        y: 120,
+        height: 88,
+        theme: "light",
+        laneId: getSequenceLaneId(rightLifeline),
+      }),
+      { regenerateIds: false },
+    )[0] as OrderedExcalidrawElement;
+    const message = convertToExcalidrawElements(
+      createSequenceStencil("message", "light", defaults),
+      { regenerateIds: false },
+    )[0] as OrderedExcalidrawElement & ExcalidrawLinearElement;
+
+    const synced = synchronizeSequenceDiagramElements([
+      ...leftLane,
+      ...rightLane,
+      leftActivation,
+      rightActivation,
+      {
+        ...message,
+        x: leftActivation.x + leftActivation.width,
+        y: 120,
+        customData: {
+          ...message.customData,
+          sequenceDiagram: {
+            ...message.customData?.sequenceDiagram,
+            variant: "message",
+            fromLaneId: getSequenceLaneId(leftLifeline),
+            toLaneId: getSequenceLaneId(rightLifeline),
+            fromActivationId: leftActivation.id,
+            toActivationId: rightActivation.id,
+          },
+        },
+      },
+    ]);
+    const syncedMessage = synced.elements.find((element) =>
+      isSequenceMessageElement(element),
+    )! as OrderedExcalidrawElement & ExcalidrawLinearElement;
+
+    expect(syncedMessage.x).toBe(leftActivation.x + leftActivation.width);
+    expect(syncedMessage.points[1][0]).toBe(
+      rightActivation.x - (leftActivation.x + leftActivation.width),
+    );
+  });
+
+  it("keeps self messages attached to the source activation edge", () => {
+    const lane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+    const lifeline = lane.find((element) => isSequenceLifelineElement(element))!;
+    const sourceActivation = convertToExcalidrawElements(
+      createSequenceActivationStencil({
+        centerX: lifeline.x,
+        y: 120,
+        height: 120,
+        theme: "light",
+        laneId: getSequenceLaneId(lifeline),
+      }),
+      { regenerateIds: false },
+    )[0] as OrderedExcalidrawElement;
+    const message = convertToExcalidrawElements(
+      createSequenceStencil("self", "light", defaults),
+      { regenerateIds: false },
+    )[0] as OrderedExcalidrawElement & ExcalidrawLinearElement;
+
+    const synced = synchronizeSequenceDiagramElements([
+      ...lane,
+      sourceActivation,
+      newElementWith(message, {
+        x: sourceActivation.x + sourceActivation.width,
+        y: 120,
+        points: [
+          [0, 0],
+          [88, 0],
+          [88, 64],
+          [0, 64],
+        ],
+        customData: {
+          ...message.customData,
+          sequenceDiagram: {
+            ...message.customData?.sequenceDiagram,
+            variant: "self",
+            fromLaneId: getSequenceLaneId(lifeline),
+            toLaneId: getSequenceLaneId(lifeline),
+            fromActivationId: sourceActivation.id,
+            toActivationId: undefined,
+          },
+        },
+      }) as OrderedExcalidrawElement,
+    ]);
+    const syncedMessage = synced.elements.find((element) =>
+      isSequenceMessageElement(element),
+    )! as OrderedExcalidrawElement & ExcalidrawLinearElement;
+
+    expect(syncedMessage.x).toBe(sourceActivation.x + sourceActivation.width);
+    expect(syncedMessage.points[3][0]).toBe(0);
+    expect(syncedMessage.points[3][1]).toBe(64);
+    expect(syncedMessage.customData?.sequenceDiagram?.toActivationId).toBe(
+      undefined,
+    );
+  });
+
+  it("extends only the lifeline on vertical participant resize", () => {
+    const laneElements = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+
+    const participant = laneElements.find((element) =>
+      element.id.startsWith("sequence-participant-"),
+    )!;
+    const participantLabel = laneElements.find(
+      (element) => element.type === "text" && element.containerId === participant.id,
+    ) as ExcalidrawTextElement;
+    const lifeline = laneElements.find((element) =>
+      isSequenceLifelineElement(element),
+    )!;
+
+    const synced = synchronizeSequenceDiagramElements(
+      laneElements.map((element) => {
+        if (element.id === participant.id) {
+          return {
+            ...element,
+            width: participant.width + 120,
+            height: 132,
+          } as OrderedExcalidrawElement;
+        }
+        if (element.id === participantLabel.id) {
+          return {
+            ...element,
+            fontSize: 34,
+            lineHeight: 1.8,
+            width: participantLabel.width * 1.8,
+            height: participantLabel.height * 1.8,
+          } as unknown as OrderedExcalidrawElement;
+        }
+        if (element.id === lifeline.id) {
+          return {
+            ...element,
+            y: participant.y + 132,
+            height: lifeline.height + 84,
+            points: [
+              [0, 0],
+              [0, lifeline.height + 84],
+            ] as ExcalidrawLinearElement["points"],
+          } as OrderedExcalidrawElement;
+        }
+        return element;
+      }),
+      { [participant.id]: true, [lifeline.id]: true },
+      {
+        resizeHandleType: "s",
+        originalElements: new Map(
+          laneElements.map((element) => [element.id, element as ExcalidrawElement]),
+        ),
+      },
+    );
+
+    const nextParticipant = synced.elements.find(
+      (element) => element.id === participant.id,
+    )!;
+    const nextLabel = synced.elements.find(
+      (element) => element.id === participantLabel.id,
+    ) as ExcalidrawTextElement;
+    const nextLifeline = synced.elements.find((element) =>
+      isSequenceLifelineElement(element),
+    )!;
+
+    expect(nextParticipant.height).toBe(SEQUENCE_PARTICIPANT_HEIGHT);
+    expect(nextParticipant.width).toBe(participant.width);
+    expect(nextLabel.fontSize).toBe(SEQUENCE_TEXT_FONT_SIZE);
+    expect(nextLifeline.y).toBe(participant.y + SEQUENCE_PARTICIPANT_HEIGHT);
+    expect(nextLifeline.height).toBeGreaterThan(lifeline.height);
+  });
+
+  it("moves the participant when the lifeline itself is dragged", () => {
+    const laneElements = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+
+    const participant = laneElements.find((element) =>
+      element.id.startsWith("sequence-participant-"),
+    )!;
+    const lifeline = laneElements.find((element) =>
+      isSequenceLifelineElement(element),
+    )!;
+
+    const movedLifeline = {
+      ...lifeline,
+      x: lifeline.x + 140,
+    } as OrderedExcalidrawElement;
+
+    const synced = synchronizeSequenceDiagramElements(
+      laneElements.map((element) =>
+        element.id === movedLifeline.id ? movedLifeline : element,
+      ),
+      { [movedLifeline.id]: true },
+    );
+
+    const nextParticipant = synced.elements.find(
+      (element) => element.id === participant.id,
+    )!;
+    const nextLifeline = synced.elements.find((element) =>
+      isSequenceLifelineElement(element),
+    )!;
+
+    expect(nextParticipant.x + nextParticipant.width / 2).toBe(nextLifeline.x);
+  });
+
+  it("moves grouped actor decorations when the lifeline is dragged", () => {
+    const laneElements = convertToExcalidrawElements(
+      createSequenceStencil("actor", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+
+    const lifeline = laneElements.find((element) =>
+      isSequenceLifelineElement(element),
+    )!;
+    const decoration = laneElements.find(
+      (element) =>
+        element.groupIds[0] === lifeline.groupIds[0] &&
+        element.id !== lifeline.id &&
+        !element.id.startsWith("sequence-participant-"),
+    )!;
+
+    const movedLifeline = {
+      ...lifeline,
+      x: lifeline.x + 120,
+    } as OrderedExcalidrawElement;
+
+    const synced = synchronizeSequenceDiagramElements(
+      laneElements.map((element) =>
+        element.id === lifeline.id ? movedLifeline : element,
+      ),
+      { [movedLifeline.id]: true },
+    );
+
+    const nextLifeline = synced.elements.find((element) =>
+      isSequenceLifelineElement(element),
+    )!;
+    const nextDecoration = synced.elements.find(
+      (element) => element.id === decoration.id,
+    )!;
+
+    expect(nextDecoration.x - decoration.x).toBe(nextLifeline.x - lifeline.x);
+  });
+
+  it("moves grouped actor decorations when the participant itself is dragged", () => {
+    const laneElements = convertToExcalidrawElements(
+      createSequenceStencil("actor", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+
+    const participant = laneElements.find((element) =>
+      element.id.startsWith("sequence-participant-"),
+    )!;
+    const lifeline = laneElements.find((element) =>
+      isSequenceLifelineElement(element),
+    )!;
+    const decoration = laneElements.find(
+      (element) =>
+        element.groupIds[0] === lifeline.groupIds[0] &&
+        element.id !== lifeline.id &&
+        element.id !== participant.id,
+    )!;
+
+    const movedParticipant = {
+      ...participant,
+      x: participant.x + 90,
+    } as OrderedExcalidrawElement;
+
+    const synced = synchronizeSequenceDiagramElements(
+      laneElements.map((element) =>
+        element.id === participant.id ? movedParticipant : element,
+      ),
+      { [movedParticipant.id]: true },
+    );
+
+    const nextLifeline = synced.elements.find((element) =>
+      isSequenceLifelineElement(element),
+    )!;
+    const nextDecoration = synced.elements.find(
+      (element) => element.id === decoration.id,
+    )!;
+
+    expect(nextLifeline.x - lifeline.x).toBe(90);
+    expect(nextDecoration.x - decoration.x).toBe(
+      nextLifeline.x +
+        nextLifeline.width / 2 -
+        (lifeline.x + lifeline.width / 2),
+    );
+  });
+
+  it("stretches alt fragments to cover the participating lanes", () => {
+    const leftLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+    const rightLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ).map((element) => ({
+      ...element,
+      x: element.x + 320,
+    })) as OrderedExcalidrawElement[];
+    const fragment = convertToExcalidrawElements(
+      createSequenceStencil("alt", "light", defaults),
+      { regenerateIds: false },
+    ).map((element) => ({
+      ...element,
+      x: element.x + 40,
+      y: element.y + 120,
+    })) as OrderedExcalidrawElement[];
+
+    const synced = synchronizeSequenceDiagramElements([
+      ...leftLane,
+      ...rightLane,
+      ...fragment,
+    ]);
+
+    const lifelines = synced.elements
+      .filter((element) => isSequenceLifelineElement(element))
+      .sort((a, b) => a.x - b.x);
+    const fragmentParts = synced.elements.filter((element) =>
+      isSequenceFragmentElement(element),
+    );
+    const outline = fragmentParts.find(
+      (element) => element.customData?.sequenceDiagram?.part === "outline",
+    )!;
+    const divider = fragmentParts.find(
+      (element) => element.customData?.sequenceDiagram?.part === "divider",
+    ) as OrderedExcalidrawElement & ExcalidrawLinearElement;
+
+    expect(outline.x).toBe(Math.min(lifelines[0].x, lifelines[1].x) - 40);
+    expect(outline.width).toBe(Math.abs(lifelines[1].x - lifelines[0].x) + 80);
+    expect(divider.points[1][0]).toBe(outline.width);
+  });
+
+  it("keeps fragment header labels on one line with a fixed header height", () => {
+    const leftLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+    const rightLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ).map((element) => ({
+      ...element,
+      x: element.x + 320,
+    })) as OrderedExcalidrawElement[];
+    const fragment = convertToExcalidrawElements(
+      createSequenceStencil("loop", "light", defaults),
+      { regenerateIds: false },
+    ).map((element) => ({
+      ...element,
+      x: element.x + 40,
+      y: element.y + 120,
+    })) as OrderedExcalidrawElement[];
+
+    const synced = synchronizeSequenceDiagramElements([
+      ...leftLane,
+      ...rightLane,
+      ...fragment,
+    ]);
+    const outline = synced.elements.find(
+      (element) => element.customData?.sequenceDiagram?.part === "outline",
+    )!;
+    const header = synced.elements.find(
+      (element) => element.customData?.sequenceDiagram?.part === "header",
+    )!;
+    const headerLabel = synced.elements.find(
+      (element) => element.customData?.sequenceDiagram?.part === "label",
+    ) as ExcalidrawTextElement | undefined;
+
+    expect(header.height).toBe(SEQUENCE_FRAGMENT_HEADER_HEIGHT);
+    expect(header.y).toBe(outline.y);
+    expect(header.width).toBeGreaterThanOrEqual(74);
+    expect(headerLabel?.containerId).toBe(null);
+    expect(headerLabel?.text).toBe(defaults.loop);
+  });
+
+  it("migrates legacy bound fragment labels into standalone text elements", () => {
+    const leftLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+    const rightLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ).map((element) => ({
+      ...element,
+      x: element.x + 320,
+    })) as OrderedExcalidrawElement[];
+    const legacyFragment = convertToExcalidrawElements(
+      [
+        {
+          type: "rectangle",
+          x: 0,
+          y: 120,
+          width: 280,
+          height: 180,
+          groupIds: ["legacy-fragment"],
+          customData: {
+            sequenceDiagram: {
+              role: "fragment",
+              variant: "alt",
+              part: "outline",
+            },
+          },
+        },
+        {
+          type: "rectangle",
+          x: 0,
+          y: 120,
+          width: 62,
+          height: 28,
+          groupIds: ["legacy-fragment"],
+          label: {
+            text: defaults.alt,
+          },
+          customData: {
+            sequenceDiagram: {
+              role: "fragment",
+              variant: "alt",
+              part: "header",
+            },
+          },
+        },
+        {
+          type: "line",
+          x: 0,
+          y: 192,
+          width: 280,
+          height: 0,
+          points: [
+            [0, 0],
+            [280, 0],
+          ],
+          groupIds: ["legacy-fragment"],
+          customData: {
+            sequenceDiagram: {
+              role: "fragment",
+              variant: "alt",
+              part: "divider",
+              offsetY: 72,
+            },
+          },
+        },
+      ] as ExcalidrawElementSkeleton[],
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+
+    const synced = synchronizeSequenceDiagramElements([
+      ...leftLane,
+      ...rightLane,
+      ...legacyFragment,
+    ]);
+    const header = synced.elements.find(
+      (element) => element.customData?.sequenceDiagram?.part === "header",
+    )!;
+    const label = synced.elements.find(
+      (element) => element.customData?.sequenceDiagram?.part === "label",
+    ) as ExcalidrawTextElement | undefined;
+
+    expect(header.boundElements?.some((element) => element.type === "text")).toBe(
+      false,
+    );
+    expect(label?.containerId).toBe(null);
+    expect(label?.text).toBe(defaults.alt);
+  });
+
+  it("resets enlarged fragment labels back to the default text style", () => {
+    const leftLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+    const rightLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ).map((element) => ({
+      ...element,
+      x: element.x + 320,
+    })) as OrderedExcalidrawElement[];
+    const fragment = convertToExcalidrawElements(
+      createSequenceStencil("loop", "light", defaults),
+      { regenerateIds: false },
+    ).map((element) => {
+      if (element.customData?.sequenceDiagram?.part !== "label") {
+        return element;
+      }
+
+      return {
+        ...element,
+        fontSize: 44,
+        lineHeight: 1.7,
+        width: element.width * 2,
+        height: element.height * 2,
+      } as OrderedExcalidrawElement;
+    });
+
+    const synced = synchronizeSequenceDiagramElements([
+      ...leftLane,
+      ...rightLane,
+      ...(fragment as OrderedExcalidrawElement[]),
+    ]);
+    const label = synced.elements.find(
+      (element) => element.customData?.sequenceDiagram?.part === "label",
+    ) as ExcalidrawTextElement | undefined;
+
+    expect(label?.fontSize).toBe(SEQUENCE_TEXT_FONT_SIZE);
+    expect(label?.lineHeight).toBe(SEQUENCE_TEXT_LINE_HEIGHT);
+    expect(label?.width).toBeLessThan(120);
+  });
+
+  it("rebinds a selected fragment when it is dragged to another lane span", () => {
+    const leftLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+    const middleLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ).map((element) => ({
+      ...element,
+      x: element.x + 320,
+    })) as OrderedExcalidrawElement[];
+    const rightLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ).map((element) => ({
+      ...element,
+      x: element.x + 640,
+    })) as OrderedExcalidrawElement[];
+    const fragment = convertToExcalidrawElements(
+      createSequenceStencil("alt", "light", defaults),
+      { regenerateIds: false },
+    ).map((element) => ({
+      ...element,
+      x: element.x + 40,
+      y: element.y + 120,
+    })) as OrderedExcalidrawElement[];
+
+    const firstSync = synchronizeSequenceDiagramElements([
+      ...leftLane,
+      ...middleLane,
+      ...rightLane,
+      ...fragment,
+    ]);
+    const lifelines = firstSync.elements
+      .filter((element) => isSequenceLifelineElement(element))
+      .sort((a, b) => a.x - b.x);
+    const fragmentParts = firstSync.elements.filter((element) =>
+      isSequenceFragmentElement(element),
+    );
+    const outline = fragmentParts.find(
+      (element) => element.customData?.sequenceDiagram?.part === "outline",
+    )!;
+
+    const secondSync = synchronizeSequenceDiagramElements(
+      firstSync.elements.map((element) =>
+        element.groupIds[0] === outline.groupIds[0]
+          ? ({ ...element, x: element.x + 320 } as OrderedExcalidrawElement)
+          : element,
+      ),
+      { [outline.id]: true },
+    );
+    const reboundOutline = secondSync.elements.find(
+      (element) => element.id === outline.id,
+    )!;
+
+    expect(reboundOutline.customData?.sequenceDiagram?.fromLaneId).toBe(
+      getSequenceLaneId(lifelines[1]),
+    );
+    expect(reboundOutline.customData?.sequenceDiagram?.toLaneId).toBe(
+      getSequenceLaneId(lifelines[2]),
+    );
+  });
+
+  it("preserves fragment width when resizing horizontally from one side", () => {
+    const leftLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+    const rightLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ).map((element) => ({
+      ...element,
+      x: element.x + 320,
+    })) as OrderedExcalidrawElement[];
+    const fragment = convertToExcalidrawElements(
+      createSequenceStencil("alt", "light", defaults),
+      { regenerateIds: false },
+    ).map((element) => ({
+      ...element,
+      x: element.x + 40,
+      y: element.y + 120,
+    })) as OrderedExcalidrawElement[];
+
+    const firstSync = synchronizeSequenceDiagramElements([
+      ...leftLane,
+      ...rightLane,
+      ...fragment,
+    ]);
+    const outline = firstSync.elements.find(
+      (element) => element.customData?.sequenceDiagram?.part === "outline",
+    )!;
+
+    const secondSync = synchronizeSequenceDiagramElements(
+      firstSync.elements.map((element) =>
+        element.id === outline.id
+          ? ({
+              ...element,
+              x: element.x + 60,
+              width: element.width - 60,
+            } as OrderedExcalidrawElement)
+          : element,
+      ),
+      { [outline.id]: true },
+      { resizeHandleType: "w" },
+    );
+    const resizedOutline = secondSync.elements.find(
+      (element) => element.id === outline.id,
+    )!;
+    const resizedHeader = secondSync.elements.find(
+      (element) => element.customData?.sequenceDiagram?.part === "header",
+    )!;
+    const resizedDivider = secondSync.elements.find(
+      (element) => element.customData?.sequenceDiagram?.part === "divider",
+    ) as OrderedExcalidrawElement & ExcalidrawLinearElement;
+
+    expect(resizedOutline.x).toBe(outline.x + 60);
+    expect(resizedOutline.width).toBe(outline.width - 60);
+    expect(resizedHeader.x).toBe(resizedOutline.x);
+    expect(resizedDivider.x).toBe(resizedOutline.x);
+    expect(resizedDivider.points[1][0]).toBe(resizedOutline.width);
+  });
+
+  it("keeps a dragged alt divider offset instead of snapping back", () => {
+    const leftLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+    const rightLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ).map((element) => ({
+      ...element,
+      x: element.x + 320,
+    })) as OrderedExcalidrawElement[];
+    const fragment = convertToExcalidrawElements(
+      createSequenceStencil("alt", "light", defaults),
+      { regenerateIds: false },
+    ).map((element) => ({
+      ...element,
+      x: element.x + 40,
+      y: element.y + 120,
+    })) as OrderedExcalidrawElement[];
+
+    const firstSync = synchronizeSequenceDiagramElements([
+      ...leftLane,
+      ...rightLane,
+      ...fragment,
+    ]);
+    const divider = firstSync.elements.find(
+      (element) => element.customData?.sequenceDiagram?.part === "divider",
+    ) as OrderedExcalidrawElement & ExcalidrawLinearElement;
+
+    const secondSync = synchronizeSequenceDiagramElements(
+      firstSync.elements.map((element) =>
+        element.id === divider.id
+          ? ({ ...element, y: element.y + 36 } as OrderedExcalidrawElement)
+          : element,
+      ),
+      { [divider.id]: true },
+    );
+    const shiftedDivider = secondSync.elements.find(
+      (element) => element.id === divider.id,
+    ) as OrderedExcalidrawElement & ExcalidrawLinearElement;
+
+    expect(shiftedDivider.y).toBe(divider.y + 36);
+    expect(shiftedDivider.customData?.sequenceDiagram?.offsetY).toBe(108);
+  });
+
+  it("binds note boxes to lanes and keeps them attached when the lane moves", () => {
+    const laneElements = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+    const lifeline = laneElements.find((element) =>
+      isSequenceLifelineElement(element),
+    )!;
+    const note = convertToExcalidrawElements(
+      createSequenceStencil("note", "light", defaults),
+      { regenerateIds: false },
+    )[0] as OrderedExcalidrawElement;
+
+    const shiftedNote = {
+      ...note,
+      x: lifeline.x + 40,
+      y: lifeline.y + 80,
+    } as OrderedExcalidrawElement;
+
+    const firstSync = synchronizeSequenceDiagramElements([
+      ...laneElements,
+      shiftedNote,
+    ]);
+    const syncedLifeline = firstSync.elements.find((element) =>
+      isSequenceLifelineElement(element),
+    )!;
+    const syncedNote = firstSync.elements.find((element) =>
+      isSequenceNoteElement(element),
+    )!;
+
+    expect(getSequenceLaneId(syncedNote)).toBe(
+      getSequenceLaneId(syncedLifeline),
+    );
+
+    const movedLane = firstSync.elements.map((element) =>
+      getSequenceLaneId(element) === getSequenceLaneId(lifeline)
+        ? ({ ...element, x: element.x + 100 } as OrderedExcalidrawElement)
+        : element,
+    );
+
+    const secondSync = synchronizeSequenceDiagramElements(movedLane);
+    const movedNote = secondSync.elements.find((element) =>
+      isSequenceNoteElement(element),
+    )!;
+    const movedLifeline = secondSync.elements.find((element) =>
+      isSequenceLifelineElement(element),
+    )!;
+
+    expect(movedNote.x).toBeGreaterThan(movedLifeline.x);
+    expect(getSequenceLaneId(movedNote)).toBe(getSequenceLaneId(movedLifeline));
+  });
+
+  it("rebinds a selected note when it is dragged to another lane", () => {
+    const leftLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+    const rightLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ).map((element) => ({
+      ...element,
+      x: element.x + 320,
+    })) as OrderedExcalidrawElement[];
+    const note = convertToExcalidrawElements(
+      createSequenceStencil("note", "light", defaults),
+      { regenerateIds: false },
+    )[0] as OrderedExcalidrawElement;
+
+    const firstSync = synchronizeSequenceDiagramElements([
+      ...leftLane,
+      ...rightLane,
+      { ...note, x: 40, y: 120 } as OrderedExcalidrawElement,
+    ]);
+    const lifelines = firstSync.elements
+      .filter((element) => isSequenceLifelineElement(element))
+      .sort((a, b) => a.x - b.x);
+    const syncedNote = firstSync.elements.find((element) =>
+      isSequenceNoteElement(element),
+    )!;
+
+    const movedNote = {
+      ...syncedNote,
+      x: lifelines[1].x + 32,
+    } as OrderedExcalidrawElement;
+
+    const secondSync = synchronizeSequenceDiagramElements(
+      firstSync.elements.map((element) =>
+        element.id === movedNote.id ? movedNote : element,
+      ),
+      { [movedNote.id]: true },
+    );
+    const reboundNote = secondSync.elements.find((element) =>
+      isSequenceNoteElement(element),
+    )!;
+
+    expect(getSequenceLaneId(reboundNote)).toBe(
+      getSequenceLaneId(lifelines[1]),
     );
   });
 });

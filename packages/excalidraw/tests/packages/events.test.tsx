@@ -2,7 +2,7 @@ import { vi } from "vitest";
 import { Excalidraw, StoreAction } from "../../index";
 import type { ExcalidrawImperativeAPI } from "../../types";
 import { resolvablePromise } from "../../utils";
-import { render } from "../test-utils";
+import { cleanup, render } from "../test-utils";
 import { Pointer } from "../helpers/ui";
 
 describe("event callbacks", () => {
@@ -59,5 +59,19 @@ describe("event callbacks", () => {
     mouse.up();
     expect(onPointerDown).toHaveBeenCalledTimes(1);
     expect(onPointerUp).toHaveBeenCalledTimes(1);
+  });
+
+  it("should trigger onPointerUpAfterFinalize after pointer up completes", async () => {
+    const onPointerUpAfterFinalize = vi.fn();
+
+    cleanup();
+    await render(
+      <Excalidraw onPointerUpAfterFinalize={onPointerUpAfterFinalize} />,
+    );
+
+    mouse.downAt(100);
+    expect(onPointerUpAfterFinalize).not.toHaveBeenCalled();
+    mouse.up();
+    expect(onPointerUpAfterFinalize).toHaveBeenCalledTimes(1);
   });
 });

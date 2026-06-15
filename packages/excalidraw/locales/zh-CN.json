@@ -627,6 +627,11 @@
     "description": "把类似飞书画板的时序图图元直接插到画布里。插入后仍然是普通 Excalidraw 元素，可以继续拖拽、改字和组合。",
     "footer": "提示：插入后你可以继续移动、改文案、重新组合、缩放，或者在这些图元上继续自由绘制。",
     "menu": "时序图图元",
+    "direction": {
+      "title": "请求方向",
+      "ltr": "请求向右",
+      "rtl": "请求向左"
+    },
     "sections": {
       "templates": "模板",
       "participants": "参与者",
@@ -638,6 +643,7 @@
       "participant": "参与者",
       "service": "服务",
       "database": "数据库",
+      "mq": "消息队列",
       "request": "请求",
       "response": "响应",
       "self": "自调用",
@@ -665,6 +671,10 @@
       "database": {
         "label": "数据库",
         "description": "数据库图元 + 生命线"
+      },
+      "mq": {
+        "label": "消息队列",
+        "description": "横向圆柱消息队列 + 生命线"
       },
       "message": {
         "label": "同步消息",

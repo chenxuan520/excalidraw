@@ -4573,6 +4573,29 @@ class App extends React.Component<AppProps, AppState> {
     return null;
   }
 
+  private getElementForHitTesting(
+    element: ExcalidrawElement,
+  ): ExcalidrawElement {
+    if (!isTextElement(element) || !isBoundToContainer(element)) {
+      return element;
+    }
+
+    const elementsMap = this.scene.getNonDeletedElementsMap();
+    const container = getContainerElement(element, elementsMap);
+    if (!isArrowElement(container)) {
+      return element;
+    }
+
+    return {
+      ...element,
+      ...LinearElementEditor.getBoundTextElementPosition(
+        container,
+        element,
+        elementsMap,
+      ),
+    } as ExcalidrawElement;
+  }
+
   private getElementAtPosition(
     x: number,
     y: number,
@@ -4685,6 +4708,27 @@ class App extends React.Component<AppProps, AppState> {
     element: ExcalidrawElement,
     considerBoundingBox = true,
   ) {
+    const elementsMap = this.scene.getNonDeletedElementsMap();
+    const targetElement = (() => {
+      if (!isTextElement(element) || !isBoundToContainer(element)) {
+        return element;
+      }
+
+      const container = getContainerElement(element, elementsMap);
+      if (!isArrowElement(container)) {
+        return element;
+      }
+
+      return {
+        ...element,
+        ...LinearElementEditor.getBoundTextElementPosition(
+          container,
+          element,
+          elementsMap,
+        ),
+      } as ExcalidrawElement;
+    })();
+
     // if the element is selected, then hit test is done against its bounding box
     if (
       considerBoundingBox &&
@@ -4692,8 +4736,8 @@ class App extends React.Component<AppProps, AppState> {
       shouldShowBoundingBox([element], this.state)
     ) {
       const selectionShape = getSelectionBoxShape(
-        element,
-        this.scene.getNonDeletedElementsMap(),
+        targetElement,
+        elementsMap,
         this.getElementHitThreshold(),
       );
 
@@ -4713,8 +4757,8 @@ class App extends React.Component<AppProps, AppState> {
     return hitElementItself({
       x,
       y,
-      element,
-      shape: getElementShape(element, this.scene.getNonDeletedElementsMap()),
+      element: targetElement,
+      shape: getElementShape(targetElement, elementsMap),
       threshold: this.getElementHitThreshold(),
       frameNameBound: isFrameLikeElement(element)
         ? this.frameNameBoundsCache.get(element)
@@ -6425,6 +6469,20 @@ class App extends React.Component<AppProps, AppState> {
       const elements = this.scene.getNonDeletedElements();
       const elementsMap = this.scene.getNonDeletedElementsMap();
       const selectedElements = this.scene.getSelectedElements(this.state);
+      const normalizeSelectionHitElement = (
+        element: NonDeleted<ExcalidrawElement> | null,
+      ) => {
+        if (!element || !isTextElement(element) || !element.containerId) {
+          return element;
+        }
+
+        const container = getContainerElement(element, elementsMap);
+        if (container && !isArrowElement(container)) {
+          return container as NonDeleted<ExcalidrawElement>;
+        }
+
+        return element;
+      };
 
       if (
         selectedElements.length === 1 &&
@@ -6511,10 +6569,15 @@ class App extends React.Component<AppProps, AppState> {
         }
         // hitElement may already be set above, so check first
         pointerDownState.hit.element =
-          pointerDownState.hit.element ??
-          this.getElementAtPosition(
-            pointerDownState.origin.x,
-            pointerDownState.origin.y,
+          normalizeSelectionHitElement(pointerDownState.hit.element) ??
+          normalizeSelectionHitElement(
+            this.getElementAtPosition(
+              pointerDownState.origin.x,
+              pointerDownState.origin.y,
+              {
+                includeBoundTextElement: true,
+              },
+            ),
           );
 
         if (pointerDownState.hit.element) {
@@ -6536,7 +6599,18 @@ class App extends React.Component<AppProps, AppState> {
         pointerDownState.hit.allHitElements = this.getElementsAtPosition(
           pointerDownState.origin.x,
           pointerDownState.origin.y,
-        );
+          true,
+        ).reduce<NonDeleted<ExcalidrawElement>[]>((acc, element) => {
+          const normalized = normalizeSelectionHitElement(element);
+          if (
+            !normalized ||
+            acc.some((candidate) => candidate.id === normalized.id)
+          ) {
+            return acc;
+          }
+          acc.push(normalized);
+          return acc;
+        }, []);
 
         const hitElement = pointerDownState.hit.element;
         const someHitElementIsSelected =
@@ -7865,6 +7939,14 @@ class App extends React.Component<AppProps, AppState> {
         isResizing,
         isRotating,
       } = this.state;
+      let didTriggerPointerUpAfterFinalize = false;
+      const triggerPointerUpAfterFinalize = () => {
+        if (didTriggerPointerUpAfterFinalize) {
+          return;
+        }
+        didTriggerPointerUpAfterFinalize = true;
+        this.props?.onPointerUpAfterFinalize?.(activeTool, pointerDownState);
+      };
 
       this.setState((prevState) => ({
         isResizing: false,
@@ -8015,6 +8097,7 @@ class App extends React.Component<AppProps, AppState> {
         });
 
         this.actionManager.executeAction(actionFinalize);
+        triggerPointerUpAfterFinalize();
 
         return;
       }
@@ -8042,6 +8125,7 @@ class App extends React.Component<AppProps, AppState> {
           );
           this.actionManager.executeAction(actionFinalize);
         }
+        triggerPointerUpAfterFinalize();
         return;
       }
 
@@ -8107,6 +8191,7 @@ class App extends React.Component<AppProps, AppState> {
             }));
           }
         }
+        triggerPointerUpAfterFinalize();
         return;
       }
 
@@ -8148,6 +8233,8 @@ class App extends React.Component<AppProps, AppState> {
           },
           storeAction: StoreAction.UPDATE,
         });
+
+        triggerPointerUpAfterFinalize();
 
         return;
       }
@@ -8401,6 +8488,7 @@ class App extends React.Component<AppProps, AppState> {
           );
         }
         this.eraseElements();
+        triggerPointerUpAfterFinalize();
         return;
       } else if (this.elementsPendingErasure.size) {
         this.restoreReadyToEraseElements();
@@ -8566,13 +8654,23 @@ class App extends React.Component<AppProps, AppState> {
         !this.state.isResizing &&
         // only hitting the bounding box of the previous hit element
         ((hitElement &&
+          !(
+            isTextElement(hitElement) &&
+            isBoundToContainer(hitElement) &&
+            isArrowElement(
+              getContainerElement(
+                hitElement,
+                this.scene.getNonDeletedElementsMap(),
+              ),
+            )
+          ) &&
           hitElementBoundingBoxOnly(
             {
               x: pointerDownState.origin.x,
               y: pointerDownState.origin.y,
-              element: hitElement,
+              element: this.getElementForHitTesting(hitElement),
               shape: getElementShape(
-                hitElement,
+                this.getElementForHitTesting(hitElement),
                 this.scene.getNonDeletedElementsMap(),
               ),
               threshold: this.getElementHitThreshold(),
@@ -8598,6 +8696,7 @@ class App extends React.Component<AppProps, AppState> {
         }
         // reset cursor
         setCursor(this.interactiveCanvas, CURSOR_TYPE.AUTO);
+        triggerPointerUpAfterFinalize();
         return;
       }
 
@@ -8630,6 +8729,7 @@ class App extends React.Component<AppProps, AppState> {
           this.state.selectedElementIds,
         )
       ) {
+        triggerPointerUpAfterFinalize();
         this.store.shouldCaptureIncrement();
       }
 
@@ -8650,6 +8750,7 @@ class App extends React.Component<AppProps, AppState> {
 
       if (activeTool.type === "laser") {
         this.laserTrails.endPath();
+        triggerPointerUpAfterFinalize();
         return;
       }
 
@@ -8685,6 +8786,8 @@ class App extends React.Component<AppProps, AppState> {
       ) {
         this.handleEmbeddableCenterClick(hitElement);
       }
+
+      triggerPointerUpAfterFinalize();
     });
   }
 

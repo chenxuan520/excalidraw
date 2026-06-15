@@ -62,6 +62,482 @@ export const normalizeAngle = (angle: number): number => {
   return angle;
 };
 
+const getSequenceDiagramMeta = (element: Pick<ExcalidrawElement, "customData">) => {
+  return element.customData?.sequenceDiagram as
+    | {
+        role?: string;
+        part?: string;
+      }
+    | undefined;
+};
+
+const getSequenceGroupElements = (
+  originalElements: PointerDownState["originalElements"],
+  elementsMap: ElementsMap,
+  groupId: string,
+) => {
+  return [...originalElements.values()]
+    .filter((orig) => orig.groupIds[0] === groupId)
+    .map((orig) => {
+      const latest = elementsMap.get(orig.id);
+      return latest ? { orig, latest } : null;
+    })
+    .filter(
+      (
+        item,
+      ): item is {
+        orig: NonDeletedExcalidrawElement;
+        latest: NonDeletedExcalidrawElement;
+      } => Boolean(item),
+    );
+};
+
+const resetElementToOriginalGeometry = (
+  latest: NonDeletedExcalidrawElement,
+  orig: NonDeletedExcalidrawElement,
+) => {
+  const update: Record<string, unknown> = {
+    x: orig.x,
+    y: orig.y,
+    width: orig.width,
+    height: orig.height,
+    angle: orig.angle,
+  };
+
+  if (isLinearElement(orig) || isFreeDrawElement(orig)) {
+    update.points = orig.points;
+  }
+
+  if (isImageElement(orig)) {
+    update.scale = orig.scale;
+  }
+
+  if (isTextElement(orig)) {
+    update.fontSize = orig.fontSize;
+    update.lineHeight = orig.lineHeight;
+    update.text = orig.text;
+    update.originalText = orig.originalText;
+  }
+
+  mutateElement(latest, update as any, false);
+};
+
+const maybeResizeSingleSequenceLaneVertically = (
+  originalElements: PointerDownState["originalElements"],
+  element: NonDeletedExcalidrawElement,
+  elementsMap: ElementsMap,
+  transformHandleType: TransformHandleDirection,
+  shouldResizeFromCenter: boolean,
+  pointerY: number,
+) => {
+  if (transformHandleType !== "s" || shouldResizeFromCenter) {
+    return false;
+  }
+
+  const groupId = element.groupIds[0];
+  if (!groupId) {
+    return false;
+  }
+
+  const targetElements = getSequenceGroupElements(
+    originalElements,
+    elementsMap,
+    groupId,
+  );
+
+  const participantItems = targetElements.filter(
+    ({ orig }) => getSequenceDiagramMeta(orig)?.role === "participant",
+  );
+  const lifelineItems = targetElements.filter(
+    ({ orig }) => getSequenceDiagramMeta(orig)?.role === "lifeline",
+  );
+
+  const participantItem = participantItems.length === 1 ? participantItems[0] : null;
+  const lifelineItem = lifelineItems.length === 1 ? lifelineItems[0] : null;
+
+  if (!participantItem || !lifelineItem) {
+    return false;
+  }
+
+  if (!participantItem || !lifelineItem || !isLinearElement(lifelineItem.orig)) {
+    return false;
+  }
+
+  for (const { orig, latest } of targetElements) {
+    if (latest.id !== lifelineItem.latest.id) {
+      resetElementToOriginalGeometry(latest, orig);
+    }
+  }
+
+  const lifelineOrig = lifelineItem.orig;
+  const nextHeight = Math.max(1, pointerY - lifelineOrig.y);
+
+  mutateElement(
+    lifelineItem.latest as any,
+    {
+      x: lifelineOrig.x,
+      y: lifelineOrig.y,
+      width: lifelineOrig.width,
+      height: nextHeight,
+      angle: lifelineOrig.angle,
+      points: [
+        [0, 0],
+        [0, nextHeight],
+      ],
+    },
+    false,
+  );
+
+  Scene.getScene(participantItem.latest)?.triggerUpdate();
+  return true;
+};
+
+const maybeResizeSingleSequenceFragmentHorizontally = (
+  originalElements: PointerDownState["originalElements"],
+  element: NonDeletedExcalidrawElement,
+  elementsMap: ElementsMap,
+  transformHandleType: TransformHandleDirection,
+  shouldResizeFromCenter: boolean,
+  pointerX: number,
+) => {
+  if (
+    !["e", "w"].includes(transformHandleType) ||
+    shouldResizeFromCenter
+  ) {
+    return false;
+  }
+
+  const groupId = element.groupIds[0];
+  if (!groupId) {
+    return false;
+  }
+
+  const targetElements = getSequenceGroupElements(
+    originalElements,
+    elementsMap,
+    groupId,
+  );
+
+  const outlineItems = targetElements.filter(
+    ({ orig }) =>
+      getSequenceDiagramMeta(orig)?.role === "fragment" &&
+      getSequenceDiagramMeta(orig)?.part === "outline",
+  );
+  const headerItems = targetElements.filter(
+    ({ orig }) =>
+      getSequenceDiagramMeta(orig)?.role === "fragment" &&
+      getSequenceDiagramMeta(orig)?.part === "header",
+  );
+
+  const outlineItem = outlineItems.length === 1 ? outlineItems[0] : null;
+  const headerItem = headerItems.length === 1 ? headerItems[0] : null;
+
+  if (
+    !outlineItem ||
+    !headerItem ||
+    outlineItem.latest.id === headerItem.latest.id
+  ) {
+    return false;
+  }
+
+  const labelItem = targetElements.find(
+    ({ orig }) =>
+      getSequenceDiagramMeta(orig)?.role === "fragment" &&
+      getSequenceDiagramMeta(orig)?.part === "label",
+  );
+  const dividerItem =
+    targetElements.find(
+    ({ orig }) =>
+      getSequenceDiagramMeta(orig)?.role === "fragment" &&
+      getSequenceDiagramMeta(orig)?.part === "divider",
+    ) ||
+    targetElements.find(
+      ({ orig }) =>
+        isLinearElement(orig) &&
+        orig.points.length === 2 &&
+        orig.points[0][1] === 0 &&
+        orig.points[1][1] === 0,
+    );
+
+  const outlineOrig = outlineItem.orig;
+  const headerOrig = headerItem.orig;
+  const outlineRight = outlineOrig.x + outlineOrig.width;
+  const minWidth = Math.max(headerOrig.width + 24, 120);
+  const nextX =
+    transformHandleType === "w"
+      ? Math.min(pointerX, outlineRight - minWidth)
+      : outlineOrig.x;
+  const nextWidth =
+    transformHandleType === "w"
+      ? outlineRight - nextX
+      : Math.max(minWidth, pointerX - outlineOrig.x);
+
+  for (const { orig, latest } of targetElements) {
+    if (
+      latest.id !== outlineItem.latest.id &&
+      latest.id !== headerItem.latest.id &&
+      latest.id !== labelItem?.latest.id &&
+      latest.id !== dividerItem?.latest.id
+    ) {
+      resetElementToOriginalGeometry(latest, orig);
+    }
+  }
+
+  mutateElement(
+    outlineItem.latest,
+    {
+      x: nextX,
+      y: outlineOrig.y,
+      width: nextWidth,
+      height: outlineOrig.height,
+      angle: outlineOrig.angle,
+    },
+    false,
+  );
+
+  mutateElement(
+    headerItem.latest,
+    {
+      x: nextX,
+      y: headerOrig.y,
+      width: headerOrig.width,
+      height: headerOrig.height,
+      angle: headerOrig.angle,
+    },
+    false,
+  );
+
+  if (labelItem && isTextElement(labelItem.orig)) {
+    mutateElement(
+      labelItem.latest as any,
+      {
+        x: nextX + (labelItem.orig.x - headerOrig.x),
+        y: labelItem.orig.y,
+        width: labelItem.orig.width,
+        height: labelItem.orig.height,
+        angle: labelItem.orig.angle,
+        fontSize: labelItem.orig.fontSize,
+        lineHeight: labelItem.orig.lineHeight,
+        text: labelItem.orig.text,
+        originalText: labelItem.orig.originalText,
+      },
+      false,
+    );
+  }
+
+  if (dividerItem && isLinearElement(dividerItem.orig)) {
+    mutateElement(
+      dividerItem.latest as any,
+      {
+        x: nextX,
+        y: dividerItem.orig.y,
+        width: nextWidth,
+        height: dividerItem.orig.height,
+        angle: dividerItem.orig.angle,
+        points: [
+          [0, 0],
+          [nextWidth, 0],
+        ],
+      },
+      false,
+    );
+  }
+
+  Scene.getScene(outlineItem.latest)?.triggerUpdate();
+  return true;
+};
+
+const maybeResizeSequenceLaneGroupVertically = (
+  targetElements: {
+    orig: NonDeletedExcalidrawElement;
+    latest: NonDeletedExcalidrawElement;
+  }[],
+  transformHandleType: TransformHandleDirection,
+  shouldResizeFromCenter: boolean,
+  pointerY: number,
+) => {
+  if (transformHandleType !== "s" || shouldResizeFromCenter) {
+    return false;
+  }
+
+  const participantItems = targetElements.filter(
+    ({ orig }) => getSequenceDiagramMeta(orig)?.role === "participant",
+  );
+  const lifelineItems = targetElements.filter(
+    ({ orig }) => getSequenceDiagramMeta(orig)?.role === "lifeline",
+  );
+
+  if (participantItems.length !== 1 || lifelineItems.length !== 1) {
+    return false;
+  }
+
+  const participantItem = participantItems[0];
+  const lifelineItem = lifelineItems[0];
+  if (!isLinearElement(lifelineItem.orig)) {
+    return false;
+  }
+
+  for (const { orig, latest } of targetElements) {
+    if (latest.id !== lifelineItem.latest.id) {
+      resetElementToOriginalGeometry(latest, orig);
+    }
+  }
+
+  const lifelineOrig = lifelineItem.orig;
+  const nextHeight = Math.max(1, pointerY - lifelineOrig.y);
+
+  mutateElement(
+    lifelineItem.latest as any,
+    {
+      x: lifelineOrig.x,
+      y: lifelineOrig.y,
+      width: lifelineOrig.width,
+      height: nextHeight,
+      angle: lifelineOrig.angle,
+      points: [
+        [0, 0],
+        [0, nextHeight],
+      ],
+    },
+    false,
+  );
+
+  Scene.getScene(participantItem.latest)?.triggerUpdate();
+  return true;
+};
+
+const maybeResizeSequenceFragmentGroupHorizontally = (
+  targetElements: {
+    orig: NonDeletedExcalidrawElement;
+    latest: NonDeletedExcalidrawElement;
+  }[],
+  transformHandleType: TransformHandleDirection,
+  shouldResizeFromCenter: boolean,
+  pointerX: number,
+) => {
+  if (
+    (transformHandleType !== "e" && transformHandleType !== "w") ||
+    shouldResizeFromCenter
+  ) {
+    return false;
+  }
+
+  const outlineItems = targetElements.filter(
+    ({ orig }) =>
+      getSequenceDiagramMeta(orig)?.role === "fragment" &&
+      getSequenceDiagramMeta(orig)?.part === "outline",
+  );
+  const headerItems = targetElements.filter(
+    ({ orig }) =>
+      getSequenceDiagramMeta(orig)?.role === "fragment" &&
+      getSequenceDiagramMeta(orig)?.part === "header",
+  );
+
+  if (outlineItems.length !== 1 || headerItems.length !== 1) {
+    return false;
+  }
+
+  const outlineItem = outlineItems[0];
+  const headerItem = headerItems[0];
+  const labelItem = targetElements.find(
+    ({ orig }) =>
+      getSequenceDiagramMeta(orig)?.role === "fragment" &&
+      getSequenceDiagramMeta(orig)?.part === "label",
+  );
+  const dividerItem = targetElements.find(
+    ({ orig }) =>
+      getSequenceDiagramMeta(orig)?.role === "fragment" &&
+      getSequenceDiagramMeta(orig)?.part === "divider",
+  );
+
+  const outlineOrig = outlineItem.orig;
+  const headerOrig = headerItem.orig;
+  const outlineRight = outlineOrig.x + outlineOrig.width;
+  const minWidth = Math.max(headerOrig.width + 24, 120);
+  const nextX =
+    transformHandleType === "w"
+      ? Math.min(pointerX, outlineRight - minWidth)
+      : outlineOrig.x;
+  const nextWidth =
+    transformHandleType === "w"
+      ? outlineRight - nextX
+      : Math.max(minWidth, pointerX - outlineOrig.x);
+
+  for (const { orig, latest } of targetElements) {
+    if (
+      latest.id !== outlineItem.latest.id &&
+      latest.id !== headerItem.latest.id &&
+      latest.id !== labelItem?.latest.id &&
+      latest.id !== dividerItem?.latest.id
+    ) {
+      resetElementToOriginalGeometry(latest, orig);
+    }
+  }
+
+  mutateElement(
+    outlineItem.latest,
+    {
+      x: nextX,
+      y: outlineOrig.y,
+      width: nextWidth,
+      height: outlineOrig.height,
+      angle: outlineOrig.angle,
+    },
+    false,
+  );
+
+  mutateElement(
+    headerItem.latest,
+    {
+      x: nextX,
+      y: headerOrig.y,
+      width: headerOrig.width,
+      height: headerOrig.height,
+      angle: headerOrig.angle,
+    },
+    false,
+  );
+
+  if (labelItem && isTextElement(labelItem.orig)) {
+    mutateElement(
+      labelItem.latest as any,
+      {
+        x: nextX + (labelItem.orig.x - headerOrig.x),
+        y: labelItem.orig.y,
+        width: labelItem.orig.width,
+        height: labelItem.orig.height,
+        angle: labelItem.orig.angle,
+        fontSize: labelItem.orig.fontSize,
+        lineHeight: labelItem.orig.lineHeight,
+        text: labelItem.orig.text,
+        originalText: labelItem.orig.originalText,
+      },
+      false,
+    );
+  }
+
+  if (dividerItem && isLinearElement(dividerItem.orig)) {
+    mutateElement(
+      dividerItem.latest as any,
+      {
+        x: nextX,
+        y: dividerItem.orig.y,
+        width: nextWidth,
+        height: dividerItem.orig.height,
+        angle: dividerItem.orig.angle,
+        points: [
+          [0, 0],
+          [nextWidth, 0],
+        ],
+      },
+      false,
+    );
+  }
+
+  Scene.getScene(outlineItem.latest)?.triggerUpdate();
+  return true;
+};
+
 // Returns true when transform (resizing/rotation) happened
 export const transformElements = (
   originalElements: PointerDownState["originalElements"],
@@ -99,6 +575,27 @@ export const transformElements = (
       );
       updateBoundElements(element, elementsMap);
     } else if (transformHandleType) {
+      if (
+        maybeResizeSingleSequenceLaneVertically(
+          originalElements,
+          element,
+          elementsMap,
+          transformHandleType,
+          shouldResizeFromCenter,
+          pointerY,
+        ) ||
+        maybeResizeSingleSequenceFragmentHorizontally(
+          originalElements,
+          element,
+          elementsMap,
+          transformHandleType,
+          shouldResizeFromCenter,
+          pointerX,
+        )
+      ) {
+        return true;
+      }
+
       resizeSingleElement(
         originalElements,
         shouldMaintainAspectRatio,
@@ -751,6 +1248,23 @@ export const resizeMultipleElements = (
     },
     [],
   );
+
+  if (
+    maybeResizeSequenceLaneGroupVertically(
+      targetElements,
+      transformHandleType,
+      shouldResizeFromCenter,
+      pointerY,
+    ) ||
+    maybeResizeSequenceFragmentGroupHorizontally(
+      targetElements,
+      transformHandleType,
+      shouldResizeFromCenter,
+      pointerX,
+    )
+  ) {
+    return;
+  }
 
   // getCommonBoundingBox() uses getBoundTextElement() which returns null for
   // original elements from pointerDownState, so we have to find and add these

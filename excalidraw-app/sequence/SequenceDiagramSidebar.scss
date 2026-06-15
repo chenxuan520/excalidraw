@@ -45,6 +45,50 @@
     color: var(--text-primary-color);
   }
 
+  .sequence-diagram-sidebar__direction {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-top: 0.75rem;
+  }
+
+  .sequence-diagram-sidebar__direction-title {
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--text-secondary-color);
+  }
+
+  .sequence-diagram-sidebar__direction-toggle {
+    display: inline-flex;
+    gap: 0.35rem;
+    padding: 0.25rem;
+    border: 1px solid var(--default-border-color);
+    border-radius: 999px;
+    background: var(--default-bg-color);
+  }
+
+  .sequence-diagram-sidebar__direction-option {
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-secondary-color);
+    font-size: 0.74rem;
+    font-weight: 600;
+    line-height: 1;
+    padding: 0.45rem 0.7rem;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--text-primary-color);
+    }
+  }
+
+  .sequence-diagram-sidebar__direction-option--active {
+    background: color-mix(in srgb, var(--color-primary) 14%, white);
+    color: var(--color-primary);
+  }
+
   .sequence-diagram-sidebar__hint,
   .sequence-diagram-sidebar__footer {
     color: var(--text-secondary-color);

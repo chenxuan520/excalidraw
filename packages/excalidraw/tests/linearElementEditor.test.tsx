@@ -17,6 +17,7 @@ import { API } from "../tests/helpers/api";
 import type { Point } from "../types";
 import { KEYS } from "../keys";
 import { LinearElementEditor } from "../element/linearElementEditor";
+import { mutateElement } from "../element/mutateElement";
 import { queryByTestId, queryByText } from "@testing-library/react";
 import {
   getBoundTextElementPosition,
@@ -26,7 +27,7 @@ import {
 import * as textElementUtils from "../element/textElement";
 import { ROUNDNESS, VERTICAL_ALIGN } from "../constants";
 import { vi } from "vitest";
-import { arrayToMap } from "../utils";
+import { arrayToMap, sceneCoordsToViewportCoords } from "../utils";
 import React from "react";
 
 const renderInteractiveScene = vi.spyOn(
@@ -934,6 +935,34 @@ describe("Test Linear Elements", () => {
           }
         `);
       });
+
+      it("should apply stored offset for arrow bound text", () => {
+        createTwoPointerLinearElement("arrow");
+        const arrow = h.elements[0] as ExcalidrawLinearElement;
+        const { textElement, container } = createBoundTextElement(
+          DEFAULT_TEXT,
+          arrow,
+        );
+
+        mutateElement(textElement, {
+          customData: {
+            ...textElement.customData,
+            boundTextOffset: { x: 18, y: -12 },
+          },
+        });
+
+        const position = LinearElementEditor.getBoundTextElementPosition(
+          container,
+          textElement,
+          arrayToMap(h.elements),
+        );
+        expect(position).toMatchInlineSnapshot(`
+          {
+            "x": 43,
+            "y": -2,
+          }
+        `);
+      });
     });
 
     it("should match styles for text editor", () => {
@@ -1336,8 +1365,7 @@ describe("Test Linear Elements", () => {
       expect(label.x).toBe(0);
       expect(label.y).toBe(0);
       mouse.reset();
-      mouse.select(arrow);
-      mouse.select(label);
+      API.setSelectedElements([arrow]);
       mouse.downAt(arrow.x, arrow.y);
       mouse.moveTo(arrow.x + 20, arrow.y + 30);
       mouse.up(arrow.x + 20, arrow.y + 30);
@@ -1348,6 +1376,56 @@ describe("Test Linear Elements", () => {
       expect(arrow.y).toBe(100);
       expect(label.x).toBe(0);
       expect(label.y).toBe(0);
+    });
+
+    it("should allow dragging arrow bound text away from the midpoint", async () => {
+      createTwoPointerLinearElement("arrow");
+      const arrow = h.elements[0] as ExcalidrawLinearElement;
+      const { textElement } = createBoundTextElement(DEFAULT_TEXT, arrow);
+      const before = LinearElementEditor.getBoundTextElementPosition(
+        arrow,
+        textElement,
+        arrayToMap(h.elements),
+      );
+
+      expect(
+        (h.app as any).getElementAtPosition(before.x + 2, before.y + 2, {
+          includeBoundTextElement: true,
+        })?.id,
+      ).toBe(textElement.id);
+
+      const beforeViewport = sceneCoordsToViewportCoords(
+        { sceneX: before.x + 2, sceneY: before.y + 2 },
+        h.state,
+      );
+      const afterViewport = sceneCoordsToViewportCoords(
+        { sceneX: before.x + 42, sceneY: before.y + 18 },
+        h.state,
+      );
+
+      API.setSelectedElements([textElement]);
+
+      mouse.downAt(beforeViewport.x, beforeViewport.y);
+      mouse.moveTo(afterViewport.x, afterViewport.y);
+      mouse.upAt(afterViewport.x, afterViewport.y);
+
+      const updatedText = h.elements[1] as ExcalidrawTextElementWithContainer;
+      const after = LinearElementEditor.getBoundTextElementPosition(
+        h.elements[0] as ExcalidrawLinearElement,
+        updatedText,
+        arrayToMap(h.elements),
+      );
+
+      expect(after).toMatchInlineSnapshot(`
+        {
+          "x": 65,
+          "y": 26,
+        }
+      `);
+      expect(updatedText.customData?.boundTextOffset).toEqual({
+        x: 40,
+        y: 16,
+      });
     });
   });
 

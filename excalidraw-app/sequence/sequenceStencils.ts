@@ -4,16 +4,25 @@ import {
   THEME,
 } from "../../packages/excalidraw/constants";
 import type { ExcalidrawElementSkeleton } from "../../packages/excalidraw/data/transform";
+import { getLineHeight } from "../../packages/excalidraw/fonts";
+import { measureText } from "../../packages/excalidraw/element/textElement";
 import type { ExcalidrawElement } from "../../packages/excalidraw/element/types";
 import type { Theme } from "../../packages/excalidraw/element/types";
+import { getFontString } from "../../packages/excalidraw/utils";
 
 export const SEQUENCE_DIAGRAM_SIDEBAR_TAB = "sequence-diagram";
+
+export type SequenceRequestDirection = "ltr" | "rtl";
+
+export const DEFAULT_SEQUENCE_REQUEST_DIRECTION: SequenceRequestDirection =
+  "ltr";
 
 export type SequenceStencilDefaults = {
   actor: string;
   participant: string;
   service: string;
   database: string;
+  mq: string;
   request: string;
   response: string;
   self: string;
@@ -34,6 +43,13 @@ type SequenceElementMeta = {
   sequenceDiagram?: {
     role: SequenceElementRole;
     laneId?: string;
+    fromLaneId?: string;
+    toLaneId?: string;
+    fromActivationId?: string;
+    toActivationId?: string;
+    part?: string;
+    offsetX?: number;
+    offsetY?: number;
     topOffset?: number;
     variant?: string;
   };
@@ -45,6 +61,7 @@ export type SequenceStencilKind =
   | "participant"
   | "service"
   | "database"
+  | "mq"
   | "message"
   | "return"
   | "self"
@@ -53,6 +70,28 @@ export type SequenceStencilKind =
   | "loop"
   | "alt";
 
+export const getSequenceMessageKindForDirection = ({
+  sourceX,
+  targetX,
+  requestDirection,
+}: {
+  sourceX: number;
+  targetX: number;
+  requestDirection: SequenceRequestDirection;
+}) => {
+  const requestToRight = requestDirection === "ltr";
+  const targetToRight = targetX >= sourceX;
+  return targetToRight === requestToRight ? "message" : "return";
+};
+
+export const getSequenceMessageReverse = (
+  kind: Extract<SequenceStencilKind, "message" | "return">,
+  requestDirection: SequenceRequestDirection,
+) => {
+  const requestToRight = requestDirection === "ltr";
+  return kind === "message" ? !requestToRight : requestToRight;
+};
+
 export const sequenceStencilSections: {
   key: "templates" | "participants" | "messages" | "helpers";
   items: SequenceStencilKind[];
@@ -60,7 +99,7 @@ export const sequenceStencilSections: {
   { key: "templates", items: ["blank"] },
   {
     key: "participants",
-    items: ["actor", "participant", "service", "database"],
+    items: ["actor", "participant", "service", "database", "mq"],
   },
   { key: "messages", items: ["message", "return", "self"] },
   { key: "helpers", items: ["activation", "note", "loop", "alt"] },
@@ -78,10 +117,19 @@ type Palette = {
   fragmentStroke: string;
 };
 
-const PARTICIPANT_HEIGHT = 48;
+export const SEQUENCE_PARTICIPANT_HEIGHT = 48;
 const LIFELINE_HEIGHT = 340;
-const DEFAULT_FONT_SIZE = 16;
+export const SEQUENCE_TEXT_FONT_SIZE = 16;
 const FONT = FONT_FAMILY.Yutong;
+export const SEQUENCE_TEXT_LINE_HEIGHT = getLineHeight(FONT);
+export const SEQUENCE_TEXT_FONT_FAMILY = FONT;
+const DEFAULT_FONT = getFontString({
+  fontSize: SEQUENCE_TEXT_FONT_SIZE,
+  fontFamily: FONT,
+});
+export const SEQUENCE_FRAGMENT_HEADER_HEIGHT = 28;
+export const SEQUENCE_SELF_CALL_HEIGHT = 54;
+const SEQUENCE_FRAGMENT_HEADER_PADDING_X = 12;
 
 const getPalette = (theme: Theme): Palette => {
   if (theme === THEME.DARK) {
@@ -163,6 +211,34 @@ export const isSequenceActivationElement = (
   return element?.customData?.sequenceDiagram?.role === "activation";
 };
 
+export const isSequenceMessageElement = (
+  element: ExcalidrawElement | null | undefined,
+): element is ExcalidrawElement => {
+  return element?.customData?.sequenceDiagram?.role === "message";
+};
+
+export const isSequenceNoteElement = (
+  element: ExcalidrawElement | null | undefined,
+): element is ExcalidrawElement => {
+  return element?.customData?.sequenceDiagram?.role === "note";
+};
+
+export const isSequenceFragmentElement = (
+  element: ExcalidrawElement | null | undefined,
+): element is ExcalidrawElement => {
+  return element?.customData?.sequenceDiagram?.role === "fragment";
+};
+
+export const getSequenceFragmentMeta = (
+  element: Pick<ExcalidrawElement, "customData">,
+) => {
+  const meta = element.customData?.sequenceDiagram;
+  if (meta?.role !== "fragment") {
+    return undefined;
+  }
+  return meta;
+};
+
 export const isSequenceLifelineElement = (
   element: ExcalidrawElement | null | undefined,
 ): element is ExcalidrawElement => {
@@ -190,11 +266,80 @@ export const getSequenceLaneId = (
   );
 };
 
+export const getSequenceMessageLaneIds = (
+  element: Pick<ExcalidrawElement, "customData">,
+) => {
+  return {
+    fromLaneId: element.customData?.sequenceDiagram?.fromLaneId as
+      | string
+      | undefined,
+    toLaneId: element.customData?.sequenceDiagram?.toLaneId as
+      | string
+      | undefined,
+  };
+};
+
+export const getSequenceMessageActivationIds = (
+  element: Pick<ExcalidrawElement, "customData">,
+) => {
+  return {
+    fromActivationId: element.customData?.sequenceDiagram?.fromActivationId as
+      | string
+      | undefined,
+    toActivationId: element.customData?.sequenceDiagram?.toActivationId as
+      | string
+      | undefined,
+  };
+};
+
 const makeTextStyle = (palette: Palette) => ({
   fontFamily: FONT,
-  fontSize: DEFAULT_FONT_SIZE,
+  fontSize: SEQUENCE_TEXT_FONT_SIZE,
+  lineHeight: SEQUENCE_TEXT_LINE_HEIGHT,
   strokeColor: palette.text,
 });
+
+const makeCenteredLabel = (label: string, palette: Palette) => ({
+  text: label,
+  ...makeTextStyle(palette),
+  textAlign: "center" as const,
+  verticalAlign: "middle" as const,
+});
+
+const createCenteredText = ({
+  id,
+  x,
+  y,
+  width,
+  height,
+  label,
+  palette,
+  groupId,
+  customData,
+}: {
+  id?: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  label: string;
+  palette: Palette;
+  groupId: string;
+  customData?: SequenceElementMeta;
+}) => {
+  const metrics = measureText(label, DEFAULT_FONT, SEQUENCE_TEXT_LINE_HEIGHT);
+
+  return {
+    type: "text",
+    ...(id ? { id } : null),
+    x: x + Math.max((width - metrics.width) / 2, 0),
+    y: y + Math.max((height - metrics.height) / 2, 0),
+    text: label,
+    ...makeTextStyle(palette),
+    groupIds: [groupId],
+    ...(customData ? { customData } : null),
+  } as ExcalidrawElementSkeleton;
+};
 
 const createLifeline = (
   laneId: string,
@@ -233,7 +378,7 @@ const createParticipant = (
   const groupId = createGroupId(id);
   const laneId = `${id}-lane`;
   const width = opts?.width ?? 140;
-  const fill = opts?.fill ?? palette.boxFill;
+  const fill = opts?.fill ?? palette.accentFill;
 
   return [
     {
@@ -242,7 +387,7 @@ const createParticipant = (
       x,
       y: 0,
       width,
-      height: PARTICIPANT_HEIGHT,
+      height: SEQUENCE_PARTICIPANT_HEIGHT,
       strokeColor: palette.stroke,
       strokeWidth: 2,
       fillStyle: "solid",
@@ -254,11 +399,16 @@ const createParticipant = (
       groupIds: [groupId],
       customData: createSequenceMeta("participant", laneId),
       label: {
-        text: label,
-        ...makeTextStyle(palette),
+        ...makeCenteredLabel(label, palette),
       },
     },
-    createLifeline(laneId, groupId, x + width / 2, PARTICIPANT_HEIGHT, palette),
+    createLifeline(
+      laneId,
+      groupId,
+      x + width / 2,
+      SEQUENCE_PARTICIPANT_HEIGHT,
+      palette,
+    ),
   ] as ExcalidrawElementSkeleton[];
 };
 
@@ -346,14 +496,15 @@ const createActor = (
       roughness: 0,
       groupIds: [groupId],
     },
-    {
-      type: "text",
-      x: x + 18,
-      y: 82,
-      text: label,
-      ...makeTextStyle(palette),
-      groupIds: [groupId],
-    },
+    createCenteredText({
+      x,
+      y: 78,
+      width: 96,
+      height: 28,
+      label,
+      palette,
+      groupId,
+    }),
     createLifeline(laneId, groupId, x + 48, 108, palette),
   ] as ExcalidrawElementSkeleton[];
 };
@@ -367,10 +518,29 @@ const createDatabase = (
   const groupId = createGroupId(id);
   const laneId = `${id}-lane`;
   const width = 116;
+  const bodyY = 14;
+  const bodyHeight = 44;
   return [
     {
-      type: "ellipse",
+      type: "rectangle",
       id: createSequenceId("participant", laneId),
+      x,
+      y: bodyY,
+      width,
+      height: bodyHeight,
+      strokeColor: "transparent",
+      strokeWidth: 2,
+      fillStyle: "solid",
+      backgroundColor: palette.accentFill,
+      roughness: 0,
+      groupIds: [groupId],
+      customData: createSequenceMeta("participant", laneId),
+      label: {
+        ...makeCenteredLabel(label, palette),
+      },
+    },
+    {
+      type: "ellipse",
       x,
       y: 0,
       width,
@@ -381,17 +551,16 @@ const createDatabase = (
       backgroundColor: palette.accentFill,
       roughness: 0,
       groupIds: [groupId],
-      customData: createSequenceMeta("participant", laneId),
     },
     {
       type: "line",
       x,
-      y: 14,
+      y: bodyY,
       width: 1,
-      height: 44,
+      height: bodyHeight,
       points: [
         [0, 0],
-        [0, 44],
+        [0, bodyHeight],
       ],
       strokeColor: palette.stroke,
       strokeWidth: 2,
@@ -401,12 +570,12 @@ const createDatabase = (
     {
       type: "line",
       x: x + width,
-      y: 14,
+      y: bodyY,
       width: 1,
-      height: 44,
+      height: bodyHeight,
       points: [
         [0, 0],
-        [0, 44],
+        [0, bodyHeight],
       ],
       strokeColor: palette.stroke,
       strokeWidth: 2,
@@ -416,7 +585,7 @@ const createDatabase = (
     {
       type: "ellipse",
       x,
-      y: 44,
+      y: bodyY + bodyHeight - 14,
       width,
       height: 28,
       strokeColor: palette.stroke,
@@ -426,37 +595,130 @@ const createDatabase = (
       roughness: 0,
       groupIds: [groupId],
     },
+    createLifeline(laneId, groupId, x + width / 2, 74, palette),
+  ] as ExcalidrawElementSkeleton[];
+};
+
+const createMq = (
+  id: string,
+  x: number,
+  label: string,
+  palette: Palette,
+) => {
+  const groupId = createGroupId(id);
+  const laneId = `${id}-lane`;
+  const width = 156;
+  const capWidth = 28;
+  const bodyX = x + capWidth / 2;
+  const bodyWidth = width - capWidth;
+
+  return [
     {
-      type: "text",
-      x: x + 18,
-      y: 24,
-      text: label,
-      ...makeTextStyle(palette),
+      type: "rectangle",
+      id: createSequenceId("participant", laneId),
+      x: bodyX,
+      y: 0,
+      width: bodyWidth,
+      height: SEQUENCE_PARTICIPANT_HEIGHT,
+      strokeColor: "transparent",
+      strokeWidth: 2,
+      fillStyle: "solid",
+      backgroundColor: palette.accentFill,
+      roughness: 0,
+      groupIds: [groupId],
+      customData: createSequenceMeta("participant", laneId),
+      label: {
+        ...makeCenteredLabel(label, palette),
+      },
+    },
+    {
+      type: "ellipse",
+      x,
+      y: 0,
+      width: capWidth,
+      height: SEQUENCE_PARTICIPANT_HEIGHT,
+      strokeColor: palette.stroke,
+      strokeWidth: 2,
+      fillStyle: "solid",
+      backgroundColor: palette.accentFill,
+      roughness: 0,
       groupIds: [groupId],
     },
-    createLifeline(laneId, groupId, x + width / 2, 74, palette),
+    {
+      type: "ellipse",
+      x: x + width - capWidth,
+      y: 0,
+      width: capWidth,
+      height: SEQUENCE_PARTICIPANT_HEIGHT,
+      strokeColor: palette.stroke,
+      strokeWidth: 2,
+      fillStyle: "solid",
+      backgroundColor: palette.accentFill,
+      roughness: 0,
+      groupIds: [groupId],
+    },
+    {
+      type: "line",
+      x: bodyX,
+      y: 0,
+      width: bodyWidth,
+      height: 0,
+      points: [
+        [0, 0],
+        [bodyWidth, 0],
+      ],
+      strokeColor: palette.stroke,
+      strokeWidth: 2,
+      roughness: 0,
+      groupIds: [groupId],
+    },
+    {
+      type: "line",
+      x: bodyX,
+      y: SEQUENCE_PARTICIPANT_HEIGHT,
+      width: bodyWidth,
+      height: 0,
+      points: [
+        [0, 0],
+        [bodyWidth, 0],
+      ],
+      strokeColor: palette.stroke,
+      strokeWidth: 2,
+      roughness: 0,
+      groupIds: [groupId],
+    },
+    createLifeline(
+      laneId,
+      groupId,
+      x + width / 2,
+      SEQUENCE_PARTICIPANT_HEIGHT,
+      palette,
+    ),
   ] as ExcalidrawElementSkeleton[];
 };
 
 const createMessageArrow = (
   label: string,
   palette: Palette,
-  opts?: { dotted?: boolean; self?: boolean },
+  opts?: { dotted?: boolean; self?: boolean; reverse?: boolean },
 ) => {
   const base = {
     type: "arrow",
+    id: createSequenceId("message"),
     x: 0,
     y: 0,
     strokeColor: palette.stroke,
     strokeWidth: 2,
     roughness: 0,
     strokeStyle: opts?.dotted ? "dotted" : "solid",
-    endArrowhead: "arrow",
+    endArrowhead: opts?.dotted ? "arrow" : "triangle",
     label: {
       text: label,
       ...makeTextStyle(palette),
     },
-    customData: createSequenceMeta("message"),
+    customData: createSequenceMeta("message", undefined, {
+      variant: opts?.self ? "self" : opts?.dotted ? "return" : "message",
+    }),
   } as const;
 
   if (opts?.self) {
@@ -478,8 +740,8 @@ const createMessageArrow = (
     width: 180,
     height: 1,
     points: [
-      [0, 0],
-      [180, 0],
+      opts?.reverse ? [180, 0] : [0, 0],
+      opts?.reverse ? [0, 0] : [180, 0],
     ],
   } as ExcalidrawElementSkeleton;
 };
@@ -562,11 +824,39 @@ const createNote = (palette: Palette, label: string) => {
   ] as ExcalidrawElementSkeleton[];
 };
 
+const getFragmentHeaderMinWidth = (
+  kind: Extract<SequenceStencilKind, "loop" | "alt">,
+) => {
+  return kind === "alt" ? 62 : 74;
+};
+
+export const getSequenceFragmentHeaderWidth = (
+  kind: Extract<SequenceStencilKind, "loop" | "alt">,
+  labelWidth?: number,
+) => {
+  return Math.max(
+    getFragmentHeaderMinWidth(kind),
+    typeof labelWidth === "number"
+      ? Math.ceil(labelWidth + SEQUENCE_FRAGMENT_HEADER_PADDING_X * 2)
+      : 0,
+  );
+};
+
+export const measureSequenceText = (text: string) => {
+  return measureText(text, DEFAULT_FONT, SEQUENCE_TEXT_LINE_HEIGHT);
+};
+
 const createFragment = (
   kind: Extract<SequenceStencilKind, "loop" | "alt">,
   label: string,
   palette: Palette,
 ) => {
+  const fragmentGroupId = createGroupId(`fragment-${kind}`);
+  const headerWidth = getSequenceFragmentHeaderWidth(
+    kind,
+    measureSequenceText(label).width,
+  );
+
   const elements: ExcalidrawElementSkeleton[] = [
     {
       type: "rectangle",
@@ -576,29 +866,47 @@ const createFragment = (
       height: 180,
       strokeColor: palette.fragmentStroke,
       strokeWidth: 2,
-      strokeStyle: "dashed",
+      strokeStyle: "solid",
       backgroundColor: "transparent",
       fillStyle: "solid",
       roughness: 0,
-      customData: createSequenceMeta("fragment"),
+      customData: createSequenceMeta("fragment", undefined, {
+        variant: kind,
+        part: "outline",
+      }),
+      groupIds: [fragmentGroupId],
     },
     {
       type: "rectangle",
       x: 0,
       y: 0,
-      width: kind === "alt" ? 62 : 74,
-      height: 28,
+      width: headerWidth,
+      height: SEQUENCE_FRAGMENT_HEADER_HEIGHT,
       strokeColor: palette.fragmentStroke,
       strokeWidth: 2,
       backgroundColor: palette.accentFill,
       fillStyle: "solid",
       roughness: 0,
-      label: {
-        text: label,
-        ...makeTextStyle(palette),
-      },
-      customData: createSequenceMeta("fragment", undefined, { variant: kind }),
+      customData: createSequenceMeta("fragment", undefined, {
+        variant: kind,
+        part: "header",
+      }),
+      groupIds: [fragmentGroupId],
     },
+    createCenteredText({
+      id: createSequenceId("fragment"),
+      x: 0,
+      y: 0,
+      width: headerWidth,
+      height: SEQUENCE_FRAGMENT_HEADER_HEIGHT,
+      label,
+      palette,
+      groupId: fragmentGroupId,
+      customData: createSequenceMeta("fragment", undefined, {
+        variant: kind,
+        part: "label",
+      }),
+    }),
   ];
 
   if (kind === "alt") {
@@ -614,9 +922,14 @@ const createFragment = (
       ],
       strokeColor: palette.fragmentStroke,
       strokeWidth: 2,
-      strokeStyle: "dashed",
+      strokeStyle: "solid",
       roughness: 0,
-      customData: createSequenceMeta("fragment", undefined, { variant: kind }),
+      groupIds: [fragmentGroupId],
+      customData: createSequenceMeta("fragment", undefined, {
+        variant: kind,
+        part: "divider",
+        offsetY: 72,
+      }),
     });
   }
 
@@ -627,8 +940,13 @@ export const createSequenceStencil = (
   kind: SequenceStencilKind,
   theme: Theme,
   defaults: SequenceStencilDefaults,
+  options?: {
+    requestDirection?: SequenceRequestDirection;
+  },
 ): ExcalidrawElementSkeleton[] => {
   const palette = getPalette(theme);
+  const requestDirection =
+    options?.requestDirection ?? DEFAULT_SEQUENCE_REQUEST_DIRECTION;
 
   switch (kind) {
     case "blank":
@@ -653,10 +971,21 @@ export const createSequenceStencil = (
       });
     case "database":
       return createDatabase("database", 0, defaults.database, palette);
+    case "mq":
+      return createMq("mq", 0, defaults.mq, palette);
     case "message":
-      return [createMessageArrow(defaults.request, palette)];
+      return [
+        createMessageArrow(defaults.request, palette, {
+          reverse: getSequenceMessageReverse("message", requestDirection),
+        }),
+      ];
     case "return":
-      return [createMessageArrow(defaults.response, palette, { dotted: true })];
+      return [
+        createMessageArrow(defaults.response, palette, {
+          dotted: true,
+          reverse: getSequenceMessageReverse("return", requestDirection),
+        }),
+      ];
     case "self":
       return [createMessageArrow(defaults.self, palette, { self: true })];
     case "activation":

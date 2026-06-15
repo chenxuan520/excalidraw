@@ -575,6 +575,11 @@
     "description": "Insert Feishu-style sequence diagram stencils directly onto the canvas. Every stencil remains a normal Excalidraw element after insertion.",
     "footer": "Tip: after insertion you can keep dragging, editing text, regrouping, resizing, or continue drawing on top of the stencil.",
     "menu": "Sequence diagram shapes",
+    "direction": {
+      "title": "Request direction",
+      "ltr": "Request right",
+      "rtl": "Request left"
+    },
     "sections": {
       "templates": "Templates",
       "participants": "Participants",
@@ -586,6 +591,7 @@
       "participant": "Participant",
       "service": "Service",
       "database": "Database",
+      "mq": "Message Queue",
       "request": "request",
       "response": "response",
       "self": "self",
@@ -613,6 +619,10 @@
       "database": {
         "label": "Database",
         "description": "Database participant with lifeline"
+      },
+      "mq": {
+        "label": "Message Queue",
+        "description": "Horizontal message queue cylinder with lifeline"
       },
       "message": {
         "label": "Sync message",

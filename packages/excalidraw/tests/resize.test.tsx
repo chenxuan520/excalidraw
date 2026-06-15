@@ -15,6 +15,7 @@ import { KEYS } from "../keys";
 import { isLinearElement } from "../element/typeChecks";
 import { LinearElementEditor } from "../element/linearElementEditor";
 import { arrayToMap } from "../utils";
+import { transformElements } from "../element/resizeElements";
 
 ReactDOM.unmountComponentAtNode(document.getElementById("root")!);
 
@@ -288,6 +289,182 @@ describe.each(["line", "freedraw"] as const)("%s element", (type) => {
     expect(newBounds[2]).toBeCloseTo(bounds[2] + 20);
     expect(newBounds[3]).toBeCloseTo(bounds[3] + 30);
     expect(element.angle).toBeCloseTo(0);
+  });
+});
+
+describe("sequence groups", () => {
+  it("extends only the lifeline on vertical lane resize", async () => {
+    const groupId = "sequence-lane-test";
+    const participant = API.createElement({
+      type: "rectangle",
+      x: 100,
+      y: 80,
+      width: 140,
+      height: 48,
+      groupIds: [groupId],
+    });
+    Object.assign(participant as any, {
+      groupIds: [groupId],
+      customData: {
+        sequenceDiagram: {
+          role: "participant",
+          laneId: groupId,
+        },
+      },
+    });
+    const lifeline = API.createElement({
+      type: "line",
+      x: 170,
+      y: 128,
+      width: 1,
+      height: 180,
+      points: [
+        [0, 0],
+        [0, 180],
+      ],
+      groupIds: [groupId],
+    });
+    Object.assign(lifeline as any, {
+      groupIds: [groupId],
+      customData: {
+        sequenceDiagram: {
+          role: "lifeline",
+          laneId: groupId,
+          topOffset: 48,
+        },
+      },
+    });
+
+    h.elements = [participant, lifeline];
+
+    const originalElements = new Map<string, any>([
+      [participant.id, { ...participant }],
+      [
+        lifeline.id,
+        {
+          ...lifeline,
+          points: [...lifeline.points],
+        },
+      ],
+    ]);
+
+    transformElements(
+      originalElements,
+      "s",
+      [participant, lifeline],
+      arrayToMap(h.elements),
+      false,
+      false,
+      false,
+      lifeline.x,
+      lifeline.y + lifeline.height + 120,
+      0,
+      0,
+    );
+
+    expect(participant.width).toBe(140);
+    expect(participant.height).toBe(48);
+    expect(lifeline.height).toBeGreaterThan(180);
+    expect(lifeline.y).toBe(128);
+  });
+
+  it("resizes fragment width from one side without scaling the whole group", async () => {
+    const groupId = "sequence-fragment-test";
+    const outline = API.createElement({
+      type: "rectangle",
+      x: 120,
+      y: 140,
+      width: 320,
+      height: 180,
+      groupIds: [groupId],
+    });
+    Object.assign(outline as any, {
+      groupIds: [groupId],
+      customData: {
+        sequenceDiagram: {
+          role: "fragment",
+          variant: "alt",
+          part: "outline",
+        },
+      },
+    });
+    const header = API.createElement({
+      type: "rectangle",
+      x: 120,
+      y: 140,
+      width: 74,
+      height: 28,
+      groupIds: [groupId],
+    });
+    Object.assign(header as any, {
+      groupIds: [groupId],
+      customData: {
+        sequenceDiagram: {
+          role: "fragment",
+          variant: "alt",
+          part: "header",
+        },
+      },
+    });
+    const divider = API.createElement({
+      type: "line",
+      x: 120,
+      y: 212,
+      width: 320,
+      height: 0,
+      points: [
+        [0, 0],
+        [320, 0],
+      ],
+      groupIds: [groupId],
+    });
+    Object.assign(divider as any, {
+      groupIds: [groupId],
+      customData: {
+        sequenceDiagram: {
+          role: "fragment",
+          variant: "alt",
+          part: "divider",
+          offsetY: 72,
+        },
+      },
+    });
+
+    h.elements = [outline, header, divider];
+
+    const originalElements = new Map<string, any>([
+      [outline.id, { ...outline }],
+      [header.id, { ...header }],
+      [
+        divider.id,
+        {
+          ...divider,
+          points: [...divider.points],
+        },
+      ],
+    ]);
+
+    transformElements(
+      originalElements,
+      "w",
+      [outline, header, divider],
+      arrayToMap(h.elements),
+      false,
+      false,
+      false,
+      outline.x + 60,
+      outline.y,
+      0,
+      0,
+    );
+
+    expect(outline.x).toBeCloseTo(180);
+    expect(outline.width).toBeCloseTo(260);
+    expect(outline.height).toBe(180);
+    expect(header.x).toBeCloseTo(180);
+    expect(header.width).toBe(74);
+    expect(divider.x).toBeCloseTo(180);
+    expect(divider.points[1][0]).toBeCloseTo(260);
   });
 });
 

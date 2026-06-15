@@ -5,11 +5,17 @@ import { mutateElement } from "./mutateElement";
 import { getPerfectElementSize } from "./sizeHelpers";
 import type { NonDeletedExcalidrawElement } from "./types";
 import type { AppState, NormalizedZoomValue, PointerDownState } from "../types";
-import { getBoundTextElement, getMinTextElementWidth } from "./textElement";
+import {
+  getArrowBoundTextOffset,
+  getBoundTextElement,
+  getContainerElement,
+  getMinTextElementWidth,
+} from "./textElement";
 import { getGridPoint } from "../math";
 import type Scene from "../scene/Scene";
 import {
   isArrowElement,
+  isBoundToContainer,
   isFrameLikeElement,
   isTextElement,
 } from "./typeChecks";
@@ -59,6 +65,32 @@ export const dragSelectedElements = (
   );
 
   elementsToUpdate.forEach((element) => {
+    if (isTextElement(element) && isBoundToContainer(element)) {
+      const container = getContainerElement(
+        element,
+        scene.getNonDeletedElementsMap(),
+      );
+
+      if (isArrowElement(container)) {
+        const originalElement =
+          (pointerDownState.originalElements.get(
+            element.id,
+          ) as typeof element) || element;
+        const originalOffset = getArrowBoundTextOffset(originalElement);
+
+        mutateElement(element, {
+          customData: {
+            ...element.customData,
+            boundTextOffset: {
+              x: originalOffset.x + adjustedOffset.x,
+              y: originalOffset.y + adjustedOffset.y,
+            },
+          },
+        });
+        return;
+      }
+    }
+
     updateElementCoords(pointerDownState, element, adjustedOffset);
     if (
       // skip arrow labels since we calculate its position during render
