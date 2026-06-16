@@ -4,6 +4,7 @@ import {
 } from "../../packages/excalidraw/constants";
 import type { ExcalidrawElementSkeleton } from "../../packages/excalidraw/data/transform";
 import { getLineHeight } from "../../packages/excalidraw/fonts";
+import { t } from "../../packages/excalidraw/i18n";
 import { measureText } from "../../packages/excalidraw/element/textElement";
 import type { ExcalidrawElement } from "../../packages/excalidraw/element/types";
 import type { Theme } from "../../packages/excalidraw/element/types";
@@ -78,6 +79,26 @@ export type SequenceStencilKind =
   | "note"
   | "loop"
   | "alt";
+
+export const getSequenceStencilDefaults = (
+  translate: typeof t = t,
+): SequenceStencilDefaults => ({
+  actor: translate("sequenceDiagram.defaults.actor"),
+  service: translate("sequenceDiagram.defaults.service"),
+  boundary: translate("sequenceDiagram.defaults.boundary"),
+  control: translate("sequenceDiagram.defaults.control"),
+  entity: translate("sequenceDiagram.defaults.entity"),
+  participant: translate("sequenceDiagram.defaults.participant"),
+  database: translate("sequenceDiagram.defaults.database"),
+  mq: translate("sequenceDiagram.defaults.mq"),
+  request: translate("sequenceDiagram.defaults.request"),
+  async: translate("sequenceDiagram.defaults.async"),
+  response: translate("sequenceDiagram.defaults.response"),
+  self: translate("sequenceDiagram.defaults.self"),
+  note: translate("sequenceDiagram.defaults.note"),
+  loop: translate("sequenceDiagram.defaults.loop"),
+  alt: translate("sequenceDiagram.defaults.alt"),
+});
 
 export const getSequenceMessageKindForDirection = ({
   sourceX,
@@ -814,10 +835,9 @@ const createMq = (
       backgroundColor: palette.accentFill,
       roughness: 0,
       groupIds: [groupId],
-      customData: createSequenceMeta("participant", laneId),
-      label: {
-        ...makeCenteredLabel(label, palette),
-      },
+      customData: createSequenceMeta("participant", laneId, {
+        variant: "mq",
+      }),
     },
     {
       type: "ellipse",
@@ -875,6 +895,16 @@ const createMq = (
       roughness: 0,
       groupIds: [groupId],
     },
+    createCenteredText({
+      x: bodyX,
+      y: 0,
+      width: bodyWidth,
+      height: SEQUENCE_PARTICIPANT_HEIGHT,
+      label,
+      palette,
+      textColor: palette.surfaceText,
+      groupId,
+    }),
     createLifeline(
       laneId,
       groupId,

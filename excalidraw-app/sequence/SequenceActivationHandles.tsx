@@ -21,11 +21,12 @@ import {
   useExcalidrawElements,
 } from "../../packages/excalidraw/components/App";
 import { convertToExcalidrawElements } from "../../packages/excalidraw";
-import { t } from "../../packages/excalidraw/i18n";
+import { useI18n } from "../../packages/excalidraw/i18n";
 import {
   DEFAULT_SEQUENCE_REQUEST_DIRECTION,
   createSequenceActivationStencil,
   createSequenceStencil,
+  getSequenceStencilDefaults,
   getSequenceElementMeta,
   getSequenceLaneId,
   getSequenceMessageKindForDirection,
@@ -34,7 +35,6 @@ import {
   isSequenceParticipantElement,
   type SequenceRequestDirection,
   SEQUENCE_SELF_CALL_HEIGHT,
-  type SequenceStencilDefaults,
 } from "./sequenceStencils";
 import { synchronizeSequenceDiagramElements } from "./sequenceSystem";
 
@@ -182,32 +182,14 @@ export const SequenceActivationHandles = ({
   const elements =
     useExcalidrawElements() as readonly OrderedExcalidrawElement[];
   const { container } = useExcalidrawContainer();
+  const { t } = useI18n();
 
   const [hoveredActivation, setHoveredActivation] =
     useState<HoveredActivation | null>(null);
   const [dragState, setDragState] = useState<DragState | null>(null);
   const dragCleanupRef = useRef<(() => void) | null>(null);
 
-  const defaults = useMemo<SequenceStencilDefaults>(
-    () => ({
-      actor: t("sequenceDiagram.defaults.actor"),
-      service: t("sequenceDiagram.defaults.service"),
-      boundary: t("sequenceDiagram.defaults.boundary"),
-      control: t("sequenceDiagram.defaults.control"),
-      entity: t("sequenceDiagram.defaults.entity"),
-      participant: t("sequenceDiagram.defaults.participant"),
-      database: t("sequenceDiagram.defaults.database"),
-      mq: t("sequenceDiagram.defaults.mq"),
-      request: t("sequenceDiagram.defaults.request"),
-      async: t("sequenceDiagram.defaults.async"),
-      response: t("sequenceDiagram.defaults.response"),
-      self: t("sequenceDiagram.defaults.self"),
-      note: t("sequenceDiagram.defaults.note"),
-      loop: t("sequenceDiagram.defaults.loop"),
-      alt: t("sequenceDiagram.defaults.alt"),
-    }),
-    [],
-  );
+  const defaults = getSequenceStencilDefaults(t);
 
   const laneAnchors = useMemo(() => {
     const laneMap = new Map<string, LaneAnchor>();

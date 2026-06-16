@@ -2,10 +2,16 @@ import { convertToExcalidrawElements } from "../../packages/excalidraw";
 import { FONT_FAMILY } from "../../packages/excalidraw/constants";
 import type { ExcalidrawElementSkeleton } from "../../packages/excalidraw/data/transform";
 import {
+  defaultLang,
+  languages,
+  setLanguage,
+} from "../../packages/excalidraw/i18n";
+import {
   SEQUENCE_ACCENT_FILL,
   SEQUENCE_FRAGMENT_CONDITION_TEXT,
   SEQUENCE_FRAGMENT_ELSE_TEXT,
   createSequenceStencil,
+  getSequenceStencilDefaults,
   type SequenceStencilDefaults,
 } from "./sequenceStencils";
 
@@ -28,6 +34,24 @@ const defaults: SequenceStencilDefaults = {
 };
 
 describe("createSequenceStencil", () => {
+  afterEach(async () => {
+    await setLanguage(defaultLang);
+  });
+
+  it("returns localized defaults for the active language", async () => {
+    const zhCN = languages.find((lang) => lang.code === "zh-CN");
+
+    expect(zhCN).toBeDefined();
+
+    await setLanguage(zhCN!);
+    expect(getSequenceStencilDefaults().request).toBe("请求");
+    expect(getSequenceStencilDefaults().response).toBe("响应");
+
+    await setLanguage(defaultLang);
+    expect(getSequenceStencilDefaults().request).toBe("request");
+    expect(getSequenceStencilDefaults().response).toBe("response");
+  });
+
   it("uses the same participant palette in dark theme as light theme", () => {
     const participant = createSequenceStencil(
       "participant",
@@ -166,6 +190,52 @@ describe("createSequenceStencil", () => {
     );
 
     expect(participant?.label.fontFamily).toBe(FONT_FAMILY["Comic Shanns"]);
+  });
+
+  it("creates message queue labels as standalone top-level text", () => {
+    const mq = convertToExcalidrawElements(
+      createSequenceStencil("mq", "light", defaults),
+      { regenerateIds: false },
+    );
+
+    const participant = mq.find((element) =>
+      element.id.startsWith("sequence-participant-"),
+    )!;
+    const label = mq.find(
+      (element): element is (typeof mq)[number] & { containerId: string | null } =>
+        element.type === "text" && element.groupIds[0] === participant.groupIds[0],
+    );
+
+    expect(
+      mq.some(
+        (element) =>
+          element.type === "text" &&
+          "containerId" in element &&
+          element.containerId === participant.id,
+      ),
+    ).toBe(false);
+    expect(label).toBeDefined();
+    expect(label?.containerId ?? null).toBe(null);
+  });
+
+  it("keeps database labels bound to the database body", () => {
+    const database = convertToExcalidrawElements(
+      createSequenceStencil("database", "light", defaults),
+      { regenerateIds: false },
+    );
+
+    const participant = database.find((element) =>
+      element.id.startsWith("sequence-participant-"),
+    )!;
+
+    expect(
+      database.some(
+        (element) =>
+          element.type === "text" &&
+          "containerId" in element &&
+          element.containerId === participant.id,
+      ),
+    ).toBe(true);
   });
 
   it("keeps circular participants visually compact", () => {

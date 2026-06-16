@@ -15,7 +15,7 @@ import {
 } from "../../packages/excalidraw/components/App";
 import { serializeLibraryAsJSON } from "../../packages/excalidraw/data/json";
 import { LibraryIcon } from "../../packages/excalidraw/components/icons";
-import { t } from "../../packages/excalidraw/i18n";
+import { useI18n } from "../../packages/excalidraw/i18n";
 import { randomId } from "../../packages/excalidraw/random";
 import type { LibraryItems } from "../../packages/excalidraw/types";
 import type { ExcalidrawElement } from "../../packages/excalidraw/element/types";
@@ -30,8 +30,8 @@ import {
   isSequenceLifelineElement,
   isSequenceMessageElement,
   isSequenceParticipantElement,
+  getSequenceStencilDefaults,
   type SequenceRequestDirection,
-  type SequenceStencilDefaults,
   createSequenceStencil,
   sequenceStencilSections,
 } from "./sequenceStencils";
@@ -303,6 +303,7 @@ const SequenceStencilCard = ({
   onDragStart: (kind: SequenceStencilKind, event: React.DragEvent) => void;
   requestDirection: SequenceRequestDirection;
 }) => {
+  const { t } = useI18n();
   const previewRef = useRef<HTMLDivElement | null>(null);
   const previewAnchor = participantKinds.has(kind)
     ? { x: 0.5, y: 0 }
@@ -351,28 +352,13 @@ export const SequenceDiagramSidebar = ({
 }) => {
   const app = useApp();
   const appState = useExcalidrawAppState();
+  const { t } = useI18n();
 
   const isSequenceSidebarOpen =
     appState.openSidebar?.name === "default" &&
     appState.openSidebar?.tab === SEQUENCE_DIAGRAM_SIDEBAR_TAB;
 
-  const defaults: SequenceStencilDefaults = {
-    actor: t("sequenceDiagram.defaults.actor"),
-    service: t("sequenceDiagram.defaults.service"),
-    boundary: t("sequenceDiagram.defaults.boundary"),
-    control: t("sequenceDiagram.defaults.control"),
-    entity: t("sequenceDiagram.defaults.entity"),
-    participant: t("sequenceDiagram.defaults.participant"),
-    database: t("sequenceDiagram.defaults.database"),
-    mq: t("sequenceDiagram.defaults.mq"),
-    request: t("sequenceDiagram.defaults.request"),
-    async: t("sequenceDiagram.defaults.async"),
-    response: t("sequenceDiagram.defaults.response"),
-    self: t("sequenceDiagram.defaults.self"),
-    note: t("sequenceDiagram.defaults.note"),
-    loop: t("sequenceDiagram.defaults.loop"),
-    alt: t("sequenceDiagram.defaults.alt"),
-  };
+  const defaults = getSequenceStencilDefaults(t);
 
   const getFallbackInsertPosition = () => {
     return app.lastViewportPosition.x || app.lastViewportPosition.y

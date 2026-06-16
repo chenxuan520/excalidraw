@@ -47,6 +47,18 @@ const defaults: SequenceStencilDefaults = {
   alt: "分支",
 };
 
+const getParticipantTextElement = (
+  elements: readonly OrderedExcalidrawElement[],
+  participant: OrderedExcalidrawElement,
+) => {
+  return elements.find(
+    (element): element is ExcalidrawTextElement & OrderedExcalidrawElement =>
+      element.type === "text" &&
+      (element.containerId === participant.id ||
+        element.groupIds[0] === participant.groupIds[0]),
+  );
+};
+
 describe("synchronizeSequenceDiagramElements", () => {
   it("extends the lifeline to cover a taller activation bar", () => {
     const laneElements = convertToExcalidrawElements(
@@ -652,9 +664,7 @@ describe("synchronizeSequenceDiagramElements", () => {
     const participant = laneElements.find((element) =>
       element.id.startsWith("sequence-participant-"),
     )!;
-    const participantLabel = laneElements.find(
-      (element) => element.type === "text" && element.containerId === participant.id,
-    ) as ExcalidrawTextElement;
+    const participantLabel = getParticipantTextElement(laneElements, participant)!;
     const lifeline = laneElements.find((element) =>
       isSequenceLifelineElement(element),
     )!;
@@ -835,19 +845,17 @@ describe("synchronizeSequenceDiagramElements", () => {
     );
   });
 
-  it("moves database labels with the lane when top-edge snapping applies", () => {
+  it("moves message queue top-level labels with the lane when top-edge snapping applies", () => {
     const laneElements = convertToExcalidrawElements(
-      createSequenceStencil("database", "light", defaults),
+      createSequenceStencil("mq", "light", defaults),
       { regenerateIds: false },
     ) as OrderedExcalidrawElement[];
 
     const participant = laneElements.find((element) =>
       element.id.startsWith("sequence-participant-"),
     )!;
-    const participantLabel = laneElements.find(
-      (element) => element.type === "text" && element.containerId === participant.id,
-    ) as ExcalidrawTextElement;
-    const topEllipse = laneElements.find(
+    const participantLabel = getParticipantTextElement(laneElements, participant)!;
+    const leftCap = laneElements.find(
       (element) =>
         element.type === "ellipse" && element.groupIds[0] === participant.groupIds[0],
     )!;
@@ -862,15 +870,75 @@ describe("synchronizeSequenceDiagramElements", () => {
 
     const nextParticipant = synced.elements.find((element) => element.id === participant.id)!;
     const nextLabel = synced.elements.find(
-      (element) => element.type === "text" && element.containerId === participant.id,
+      (element) => element.id === participantLabel.id,
     ) as ExcalidrawTextElement;
-    const nextTopEllipse = synced.elements.find(
-      (element) => element.id === topEllipse.id,
+    const nextLeftCap = synced.elements.find(
+      (element) => element.id === leftCap.id,
     )!;
 
     expect(nextParticipant.y - participant.y).toBe(10);
     expect(nextLabel.y - participantLabel.y).toBe(10);
-    expect(nextTopEllipse.y - topEllipse.y).toBe(10);
+    expect(nextLeftCap.y - leftCap.y).toBe(10);
+  });
+
+  it("migrates message queue labels into standalone top-level text", () => {
+    const laneElements = convertToExcalidrawElements(
+      createSequenceStencil("mq", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+
+    const participant = laneElements.find((element) =>
+      element.id.startsWith("sequence-participant-"),
+    )!;
+    const participantLabel = getParticipantTextElement(laneElements, participant)!;
+
+    const legacyParticipant = {
+      ...participant,
+      boundElements: [{ type: "text", id: participantLabel.id }],
+      customData: {
+        ...participant.customData,
+        sequenceDiagram: {
+          ...participant.customData?.sequenceDiagram,
+          variant: undefined,
+        },
+      },
+    } as OrderedExcalidrawElement;
+    const legacyLabel = {
+      ...participantLabel,
+      containerId: participant.id,
+      groupIds: [],
+      x: participantLabel.x - 24,
+    } as ExcalidrawTextElement;
+
+    const synced = synchronizeSequenceDiagramElements(
+      laneElements.map((element) => {
+        if (element.id === participant.id) {
+          return legacyParticipant;
+        }
+        if (element.id === participantLabel.id) {
+          return legacyLabel as unknown as OrderedExcalidrawElement;
+        }
+        return element;
+      }),
+    );
+
+    const nextParticipant = synced.elements.find(
+      (element) => element.id === participant.id,
+    )!;
+    const nextLabel = synced.elements.find(
+      (element) => element.id === participantLabel.id,
+    ) as ExcalidrawTextElement;
+
+    expect(
+      nextParticipant.boundElements?.some((boundElement) => boundElement.type === "text"),
+    ).toBe(false);
+    expect(nextParticipant.customData?.sequenceDiagram?.variant).toBe("mq");
+    expect(nextLabel.containerId ?? null).toBe(null);
+    expect(nextLabel.groupIds[0]).toBe(participant.groupIds[0]);
+    expect(nextLabel.x).toBeCloseTo(
+      participant.x + (participant.width - nextLabel.width) / 2,
+      1,
+    );
   });
 
   it("keeps alt fragments at their dragged geometry instead of snapping to lanes", () => {

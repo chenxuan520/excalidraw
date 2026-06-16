@@ -96,6 +96,66 @@ const getLaneCenterX = (lane: SequenceLane) => {
     : 0;
 };
 
+const isMqParticipantLane = (lane: SequenceLane) => {
+  if (!lane.participant || lane.participant.type !== "rectangle") {
+    return false;
+  }
+
+  if (getSequenceElementMeta(lane.participant)?.variant === "mq") {
+    return true;
+  }
+
+  const ellipses = lane.members.filter(
+    (member): member is OrderedExcalidrawElement => member.type === "ellipse",
+  );
+
+  return (
+    ellipses.length === 2 &&
+    ellipses.every(
+      (ellipse) =>
+        Math.abs(ellipse.y - lane.participant!.y) <= 0.5 &&
+        Math.abs(ellipse.height - lane.participant!.height) <= 0.5 &&
+        ellipse.width < lane.participant!.width &&
+        ellipse.width <= lane.participant!.width / 2,
+    )
+  );
+};
+
+const getMqStandaloneLabel = (lane: SequenceLane) => {
+  if (!isMqParticipantLane(lane)) {
+    return null;
+  }
+
+  return (
+    lane.members.find(
+      (
+        member,
+      ): member is OrderedExcalidrawElement & ExcalidrawTextElement =>
+        member.type === "text" && !member.containerId,
+    ) || null
+  );
+};
+
+const getSequenceParticipantLabel = (
+  lane: SequenceLane,
+  elementsMap: Map<string, OrderedExcalidrawElement>,
+) => {
+  if (!lane.participant) {
+    return null;
+  }
+
+  const boundLabel = getBoundTextElement(
+    lane.participant,
+    elementsMap,
+  ) as (OrderedExcalidrawElement & ExcalidrawTextElement) | null;
+
+  if (isMqParticipantLane(lane)) {
+    return getMqStandaloneLabel(lane) || boundLabel;
+  }
+
+  return boundLabel || getMqStandaloneLabel(lane);
+};
+
 const getLaneAnchorCenterX = (
   lane: SequenceLane,
   selectedElementIds: SelectedElementIds,
@@ -495,18 +555,18 @@ const synchronizeMessages = (
       [0, 0],
       [deltaX, 0],
     ];
-    const needsUpdate =
-      Math.abs(message.x - fromX) > 0.5 ||
-      Math.abs(message.y - baseY) > 0.5 ||
-      message.points.length !== 2 ||
-      message.points[1][0] !== deltaX ||
-      message.points[1][1] !== 0 ||
-      fromLaneId !== resolvedFromLane.laneId ||
-      toLaneId !== toLane.laneId ||
-      fromActivationId !==
-        (canUseFromActivation ? fromActivation.id : undefined) ||
-      toActivationId !== (canUseToActivation ? toActivation.id : undefined) ||
-      meta?.variant !== variant;
+      const needsUpdate =
+        Math.abs(message.x - fromX) > 0.5 ||
+        Math.abs(message.y - baseY) > 0.5 ||
+        message.points.length !== 2 ||
+        message.points[1][0] !== deltaX ||
+        message.points[1][1] !== 0 ||
+        fromLaneId !== resolvedFromLane.laneId ||
+        toLaneId !== toLane.laneId ||
+        fromActivationId !==
+          (canUseFromActivation ? fromActivation.id : undefined) ||
+        toActivationId !== (canUseToActivation ? toActivation.id : undefined) ||
+        meta?.variant !== variant;
 
     if (needsUpdate) {
       updates.set(
@@ -1074,11 +1134,19 @@ const synchronizeLane = (
   const originalParticipant = options?.originalElements?.get(lane.participant.id);
   const originalLifeline = options?.originalElements?.get(lane.lifeline.id);
   const previousCenterX = getLanePreviousCenterX(lane, selectedElementIds);
+  const isMqLane = isMqParticipantLane(lane);
   const participantMeta = getSequenceElementMeta(lane.participant);
-  const participantLabel = getBoundTextElement(
-    lane.participant,
-    elementsMap,
-  ) as (OrderedExcalidrawElement & ExcalidrawTextElement) | null;
+  const participantLabel = getSequenceParticipantLabel(lane, elementsMap);
+  const nextParticipantBoundElements = isMqLane
+    ? lane.participant.boundElements?.filter(
+        (boundElement) => boundElement.type !== "text",
+      ) || []
+    : lane.participant.boundElements;
+  const shouldStripMqBoundLabel =
+    isMqLane &&
+    (lane.participant.boundElements?.some(
+      (boundElement) => boundElement.type === "text",
+    ) || false);
   const isVerticalResize =
     options?.resizeHandleType === "n" || options?.resizeHandleType === "s";
   const isSimpleRectangleLane =
@@ -1112,6 +1180,8 @@ const synchronizeLane = (
     : lane.participant.y + laneDeltaY;
   if (
     participantMeta?.laneId !== lane.laneId ||
+    (isMqLane && participantMeta?.variant !== "mq") ||
+    shouldStripMqBoundLabel ||
     Math.abs(lane.participant.x - targetParticipantX) > 0.5 ||
     Math.abs(lane.participant.y - targetParticipantY) > 0.5 ||
     Math.abs(lane.participant.width - targetParticipantWidth) > 0.5 ||
@@ -1124,8 +1194,10 @@ const synchronizeLane = (
         y: targetParticipantY,
         width: targetParticipantWidth,
         height: targetParticipantHeight,
+        ...(isMqLane ? { boundElements: nextParticipantBoundElements } : null),
         customData: mergeSequenceMeta(lane.participant, {
           laneId: lane.laneId,
+          ...(isMqLane ? { variant: "mq" } : null),
         }),
       }) as OrderedExcalidrawElement,
     );
@@ -1162,9 +1234,34 @@ const synchronizeLane = (
       targetParticipantY +
       Math.max((targetParticipantHeight - metrics.height) / 2, 0);
 
+    const nextParticipantLabel = newElementWith(participantLabel, {
+      ...(shouldOnlyExtendLifeline
+        ? {
+            text: labelText,
+            originalText: labelText,
+            fontFamily: SEQUENCE_TEXT_FONT_FAMILY,
+            fontSize: SEQUENCE_TEXT_FONT_SIZE,
+            lineHeight: SEQUENCE_TEXT_LINE_HEIGHT,
+            width: metrics.width,
+            height: metrics.height,
+          }
+        : null),
+      ...(isMqLane
+        ? {
+            containerId: null,
+            groupIds: lane.participant.groupIds,
+          }
+        : null),
+      x: nextLabelX,
+      y: nextLabelY,
+    }) as OrderedExcalidrawElement;
+
     if (
       Math.abs(participantLabel.x - nextLabelX) > 0.5 ||
       Math.abs(participantLabel.y - nextLabelY) > 0.5 ||
+      (isMqLane &&
+        (participantLabel.containerId !== null ||
+          participantLabel.groupIds[0] !== lane.participant.groupIds[0])) ||
       (shouldOnlyExtendLifeline &&
         (participantLabel.text !== labelText ||
           participantLabel.originalText !== labelText ||
@@ -1177,21 +1274,7 @@ const synchronizeLane = (
     ) {
       updates.set(
         participantLabel.id,
-        newElementWith(participantLabel, {
-          ...(shouldOnlyExtendLifeline
-            ? {
-                text: labelText,
-                originalText: labelText,
-                fontFamily: SEQUENCE_TEXT_FONT_FAMILY,
-                fontSize: SEQUENCE_TEXT_FONT_SIZE,
-                lineHeight: SEQUENCE_TEXT_LINE_HEIGHT,
-                width: metrics.width,
-                height: metrics.height,
-              }
-            : null),
-          x: nextLabelX,
-          y: nextLabelY,
-        }) as OrderedExcalidrawElement,
+        nextParticipantLabel,
       );
     }
   }
