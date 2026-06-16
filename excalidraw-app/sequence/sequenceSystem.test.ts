@@ -28,11 +28,15 @@ import { synchronizeSequenceDiagramElements } from "./sequenceSystem";
 
 const defaults: SequenceStencilDefaults = {
   actor: "角色",
-  participant: "参与者",
   service: "服务",
+  boundary: "边界",
+  control: "控制",
+  entity: "实体",
+  participant: "参与者",
   database: "数据库",
   mq: "消息队列",
   request: "请求",
+  async: "异步",
   response: "响应",
   self: "自调用",
   note: "备注",
@@ -794,7 +798,45 @@ describe("synchronizeSequenceDiagramElements", () => {
     );
   });
 
-  it("stretches alt fragments to cover the participating lanes", () => {
+  it("moves database labels with the lane when top-edge snapping applies", () => {
+    const laneElements = convertToExcalidrawElements(
+      createSequenceStencil("database", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+
+    const participant = laneElements.find((element) =>
+      element.id.startsWith("sequence-participant-"),
+    )!;
+    const participantLabel = laneElements.find(
+      (element) => element.type === "text" && element.containerId === participant.id,
+    ) as ExcalidrawTextElement;
+    const topEllipse = laneElements.find(
+      (element) =>
+        element.type === "ellipse" && element.groupIds[0] === participant.groupIds[0],
+    )!;
+
+    const synced = synchronizeSequenceDiagramElements(
+      laneElements,
+      { [participant.id]: true },
+      {
+        alignmentSnapTopYByLaneKey: new Map([[participant.groupIds[0], 10]]),
+      },
+    );
+
+    const nextParticipant = synced.elements.find((element) => element.id === participant.id)!;
+    const nextLabel = synced.elements.find(
+      (element) => element.type === "text" && element.containerId === participant.id,
+    ) as ExcalidrawTextElement;
+    const nextTopEllipse = synced.elements.find(
+      (element) => element.id === topEllipse.id,
+    )!;
+
+    expect(nextParticipant.y - participant.y).toBe(10);
+    expect(nextLabel.y - participantLabel.y).toBe(10);
+    expect(nextTopEllipse.y - topEllipse.y).toBe(10);
+  });
+
+  it("keeps alt fragments at their dragged geometry instead of snapping to lanes", () => {
     const leftLane = convertToExcalidrawElements(
       createSequenceStencil("participant", "light", defaults),
       { regenerateIds: false },
@@ -834,8 +876,9 @@ describe("synchronizeSequenceDiagramElements", () => {
       (element) => element.customData?.sequenceDiagram?.part === "divider",
     ) as OrderedExcalidrawElement & ExcalidrawLinearElement;
 
-    expect(outline.x).toBe(Math.min(lifelines[0].x, lifelines[1].x) - 40);
-    expect(outline.width).toBe(Math.abs(lifelines[1].x - lifelines[0].x) + 80);
+    expect(lifelines).toHaveLength(2);
+    expect(outline.x).toBe(40);
+    expect(outline.width).toBe(280);
     expect(divider.points[1][0]).toBe(outline.width);
   });
 
@@ -1015,7 +1058,7 @@ describe("synchronizeSequenceDiagramElements", () => {
     expect(label?.width).toBeLessThan(120);
   });
 
-  it("rebinds a selected fragment when it is dragged to another lane span", () => {
+  it("updates fragment lane metadata when dragged to another span without snapping frame geometry", () => {
     const leftLane = convertToExcalidrawElements(
       createSequenceStencil("participant", "light", defaults),
       { regenerateIds: false },
@@ -1071,6 +1114,8 @@ describe("synchronizeSequenceDiagramElements", () => {
       (element) => element.id === outline.id,
     )!;
 
+    expect(reboundOutline.x).toBe(outline.x + 320);
+    expect(reboundOutline.width).toBe(outline.width);
     expect(reboundOutline.customData?.sequenceDiagram?.fromLaneId).toBe(
       getSequenceLaneId(lifelines[1]),
     );

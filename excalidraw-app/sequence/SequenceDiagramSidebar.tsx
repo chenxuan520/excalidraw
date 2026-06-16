@@ -43,11 +43,35 @@ type SequenceStencilKind = Parameters<typeof createSequenceStencil>[0];
 
 const participantKinds = new Set<SequenceStencilKind>([
   "actor",
-  "participant",
   "service",
+  "boundary",
+  "control",
+  "entity",
   "database",
   "mq",
 ]);
+
+export const getSequenceDragAnchor = (
+  kind: SequenceStencilKind,
+  elements: readonly ExcalidrawElement[],
+) => {
+  if (!participantKinds.has(kind)) {
+    return undefined;
+  }
+
+  const anchorElements = elements.filter(
+    (element) => !isSequenceLifelineElement(element),
+  );
+  if (!anchorElements.length) {
+    return undefined;
+  }
+
+  const [minX, minY, maxX] = getCommonBounds(anchorElements);
+  return {
+    x: (minX + maxX) / 2 - minX,
+    y: 0,
+  };
+};
 
 const LANE_INSERT_GAP = 88;
 const STACK_INSERT_GAP = 56;
@@ -130,6 +154,31 @@ const SequenceStencilPreview = ({
           <path d="M45 26v40" strokeDasharray="4 4" />
         </svg>
       );
+    case "boundary":
+      return (
+        <svg viewBox="0 0 96 70" fill="none" stroke={stroke} strokeWidth="2">
+          <circle cx="48" cy="20" r="14" />
+          <path d="M30 13v14" />
+          <path d="M48 34v32" strokeDasharray="4 4" />
+        </svg>
+      );
+    case "control":
+      return (
+        <svg viewBox="0 0 96 70" fill="none" stroke={stroke} strokeWidth="2">
+          <circle cx="48" cy="20" r="14" />
+          <path d="M44 20h12" />
+          <path d="M51 16l5 4-5 4" />
+          <path d="M48 34v32" strokeDasharray="4 4" />
+        </svg>
+      );
+    case "entity":
+      return (
+        <svg viewBox="0 0 96 70" fill="none" stroke={stroke} strokeWidth="2">
+          <circle cx="48" cy="20" r="14" />
+          <path d="M32 42h32" />
+          <path d="M48 34v32" strokeDasharray="4 4" />
+        </svg>
+      );
     case "database":
       return (
         <svg viewBox="0 0 90 70" fill="none" stroke={stroke} strokeWidth="2">
@@ -162,6 +211,21 @@ const SequenceStencilPreview = ({
         <svg viewBox="0 0 90 40" fill="none" stroke={stroke} strokeWidth="2">
           <path d="M10 20h60" />
           <path d="M62 14l8 6-8 6Z" fill={stroke} stroke="none" />
+        </svg>
+      );
+    case "async":
+      if (getSequenceMessageReverse("async", requestDirection)) {
+        return (
+          <svg viewBox="0 0 90 40" fill="none" stroke={stroke} strokeWidth="2">
+            <path d="M78 20H18" />
+            <path d="M26 14l-8 6 8 6" />
+          </svg>
+        );
+      }
+      return (
+        <svg viewBox="0 0 90 40" fill="none" stroke={stroke} strokeWidth="2">
+          <path d="M10 20h60" />
+          <path d="M62 14l8 6-8 6" />
         </svg>
       );
     case "return":
@@ -240,6 +304,9 @@ const SequenceStencilCard = ({
   requestDirection: SequenceRequestDirection;
 }) => {
   const previewRef = useRef<HTMLDivElement | null>(null);
+  const previewAnchor = participantKinds.has(kind)
+    ? { x: 0.5, y: 0 }
+    : { x: 0.5, y: 0.5 };
 
   return (
     <button
@@ -251,7 +318,11 @@ const SequenceStencilCard = ({
         const dragImage = previewRef.current?.querySelector("svg");
         if (dragImage) {
           const { width, height } = dragImage.getBoundingClientRect();
-          event.dataTransfer.setDragImage(dragImage, width / 2, height / 2);
+          event.dataTransfer.setDragImage(
+            dragImage,
+            width * previewAnchor.x,
+            height * previewAnchor.y,
+          );
         }
         onDragStart(kind, event);
       }}
@@ -287,11 +358,15 @@ export const SequenceDiagramSidebar = ({
 
   const defaults: SequenceStencilDefaults = {
     actor: t("sequenceDiagram.defaults.actor"),
-    participant: t("sequenceDiagram.defaults.participant"),
     service: t("sequenceDiagram.defaults.service"),
+    boundary: t("sequenceDiagram.defaults.boundary"),
+    control: t("sequenceDiagram.defaults.control"),
+    entity: t("sequenceDiagram.defaults.entity"),
+    participant: t("sequenceDiagram.defaults.participant"),
     database: t("sequenceDiagram.defaults.database"),
     mq: t("sequenceDiagram.defaults.mq"),
     request: t("sequenceDiagram.defaults.request"),
+    async: t("sequenceDiagram.defaults.async"),
     response: t("sequenceDiagram.defaults.response"),
     self: t("sequenceDiagram.defaults.self"),
     note: t("sequenceDiagram.defaults.note"),
@@ -504,11 +579,19 @@ export const SequenceDiagramSidebar = ({
   };
 
   const onDragStart = (kind: SequenceStencilKind, event: React.DragEvent) => {
+    const payload = createDragPayload(kind);
+    const dragAnchor = getSequenceDragAnchor(kind, payload[0]?.elements || []);
     event.dataTransfer.effectAllowed = "copy";
     event.dataTransfer.setData(
       MIME_TYPES.excalidrawlib,
-      serializeLibraryAsJSON(createDragPayload(kind)),
+      serializeLibraryAsJSON(payload),
     );
+    if (dragAnchor) {
+      event.dataTransfer.setData(
+        MIME_TYPES.excalidrawlibDragAnchor,
+        JSON.stringify(dragAnchor),
+      );
+    }
   };
 
   return (

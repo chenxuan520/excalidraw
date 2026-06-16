@@ -23,6 +23,12 @@ export type SequenceParticipantAlignmentGuide = {
   referenceRightX: number;
 };
 
+type AlignmentContext = {
+  selectedLanes: LaneHeaderBounds[];
+  referenceLanes: LaneHeaderBounds[];
+  threshold: number;
+};
+
 const getLaneKey = (element: Pick<ExcalidrawElement, "groupIds" | "id" | "customData">) => {
   return element.groupIds[0] || getSequenceLaneId(element) || element.id;
 };
@@ -58,7 +64,7 @@ const getLaneHeaderBounds = (
   };
 };
 
-export const getSequenceParticipantAlignmentGuides = ({
+const getAlignmentContext = ({
   elements,
   selectedElementIds,
   zoomValue,
@@ -66,9 +72,9 @@ export const getSequenceParticipantAlignmentGuides = ({
   elements: readonly ExcalidrawElement[];
   selectedElementIds: Record<string, true> | undefined;
   zoomValue: number;
-}) => {
+}): AlignmentContext | null => {
   if (!selectedElementIds || !Object.keys(selectedElementIds).length) {
-    return [] as SequenceParticipantAlignmentGuide[];
+    return null;
   }
 
   const availableElements = elements.filter((element) => !element.isDeleted);
@@ -78,7 +84,7 @@ export const getSequenceParticipantAlignmentGuides = ({
   );
 
   if (!laneAnchors.length) {
-    return [] as SequenceParticipantAlignmentGuide[];
+    return null;
   }
 
   const laneKeys = new Set(laneAnchors.map((element) => getLaneKey(element)));
@@ -90,7 +96,7 @@ export const getSequenceParticipantAlignmentGuides = ({
   );
 
   if (!selectedLaneKeys.size) {
-    return [] as SequenceParticipantAlignmentGuide[];
+    return null;
   }
 
   const laneHeaders = [...laneKeys]
@@ -98,12 +104,110 @@ export const getSequenceParticipantAlignmentGuides = ({
     .filter((lane): lane is LaneHeaderBounds => Boolean(lane));
   const selectedLanes = laneHeaders.filter((lane) => selectedLaneKeys.has(lane.key));
   const referenceLanes = laneHeaders.filter((lane) => !selectedLaneKeys.has(lane.key));
-  const threshold = ALIGNMENT_THRESHOLD / zoomValue;
+
+  if (!selectedLanes.length || !referenceLanes.length) {
+    return null;
+  }
+
+  return {
+    selectedLanes,
+    referenceLanes,
+    threshold: ALIGNMENT_THRESHOLD / zoomValue,
+  };
+};
+
+const getClosestReferenceLane = (
+  selectedLane: LaneHeaderBounds,
+  referenceLanes: readonly LaneHeaderBounds[],
+  threshold: number,
+) => {
+  let closest: LaneHeaderBounds | null = null;
+  let closestVerticalDistance = Infinity;
+  let closestHorizontalDistance = Infinity;
+
+  for (const referenceLane of referenceLanes) {
+    const verticalDistance = Math.abs(selectedLane.topY - referenceLane.topY);
+    if (verticalDistance > threshold) {
+      continue;
+    }
+
+    const horizontalDistance = Math.abs(
+      selectedLane.centerX - referenceLane.centerX,
+    );
+    if (
+      verticalDistance < closestVerticalDistance ||
+      (verticalDistance === closestVerticalDistance &&
+        horizontalDistance < closestHorizontalDistance)
+    ) {
+      closest = referenceLane;
+      closestVerticalDistance = verticalDistance;
+      closestHorizontalDistance = horizontalDistance;
+    }
+  }
+
+  return closest;
+};
+
+export const getSequenceParticipantAlignmentSnapTargets = ({
+  elements,
+  selectedElementIds,
+  zoomValue,
+}: {
+  elements: readonly ExcalidrawElement[];
+  selectedElementIds: Record<string, true> | undefined;
+  zoomValue: number;
+}) => {
+  const context = getAlignmentContext({ elements, selectedElementIds, zoomValue });
+  if (!context) {
+    return new Map<string, number>();
+  }
+
+  const snapTargets = new Map<string, number>();
+
+  for (const selectedLane of context.selectedLanes) {
+    const referenceLane = getClosestReferenceLane(
+      selectedLane,
+      context.referenceLanes,
+      context.threshold,
+    );
+    if (!referenceLane) {
+      continue;
+    }
+    snapTargets.set(selectedLane.key, referenceLane.topY);
+  }
+
+  return snapTargets;
+};
+
+export const getSequenceParticipantAlignmentGuides = ({
+  elements,
+  selectedElementIds,
+  zoomValue,
+}: {
+  elements: readonly ExcalidrawElement[];
+  selectedElementIds: Record<string, true> | undefined;
+  zoomValue: number;
+}) => {
+  const context = getAlignmentContext({ elements, selectedElementIds, zoomValue });
+  if (!context) {
+    return [] as SequenceParticipantAlignmentGuide[];
+  }
+
+  const snapTargets = getSequenceParticipantAlignmentSnapTargets({
+    elements,
+    selectedElementIds,
+    zoomValue,
+  });
   const seenPairs = new Set<string>();
 
-  return selectedLanes.flatMap((selectedLane) => {
-    return referenceLanes.flatMap((referenceLane) => {
-      if (Math.abs(selectedLane.topY - referenceLane.topY) > threshold) {
+  return context.selectedLanes.flatMap((selectedLane) => {
+    const snapY = snapTargets.get(selectedLane.key);
+    if (typeof snapY !== "number") {
+      return [];
+    }
+
+    return context.referenceLanes.flatMap((referenceLane) => {
+      if (Math.abs(referenceLane.topY - snapY) > 0.5) {
         return [];
       }
 
@@ -120,7 +224,7 @@ export const getSequenceParticipantAlignmentGuides = ({
 
       return [
         {
-          y: (selectedLane.topY + referenceLane.topY) / 2,
+          y: snapY,
           leftX: leftLane.leftX,
           rightX: leftLane.rightX,
           referenceLeftX: rightLane.leftX,

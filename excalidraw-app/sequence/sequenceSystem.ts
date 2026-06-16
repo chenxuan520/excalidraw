@@ -51,6 +51,7 @@ type SelectedElementIds = Record<string, true> | undefined;
 type SequenceSyncOptions = {
   resizeHandleType?: string | boolean | null;
   originalElements?: Map<string, ExcalidrawElement> | null;
+  alignmentSnapTopYByLaneKey?: Map<string, number>;
 };
 
 type SequenceMessage = OrderedExcalidrawElement & ExcalidrawLinearElement;
@@ -127,6 +128,23 @@ const getLanePreviousCenterX = (
   }
 
   return getLaneCenterX(lane);
+};
+
+const getLaneHeaderTopY = (lane: SequenceLane) => {
+  let topY = Infinity;
+
+  for (const member of lane.members) {
+    if (member.id === lane.lifeline?.id) {
+      continue;
+    }
+    topY = Math.min(topY, member.y);
+  }
+
+  if (Number.isFinite(topY)) {
+    return topY;
+  }
+
+  return lane.participant?.y ?? lane.lifeline?.y ?? 0;
 };
 
 const mergeSequenceMeta = (
@@ -546,12 +564,8 @@ const synchronizeFragments = (
       typeof options?.resizeHandleType === "string" &&
       (options.resizeHandleType.includes("w") ||
         options.resizeHandleType.includes("e"));
-    const frameLeft = isHorizontalResize
-      ? fragment.outline.x
-      : Math.min(fromX, toX) - 40;
-    const frameWidth = isHorizontalResize
-      ? fragment.outline.width
-      : Math.abs(toX - fromX) + 80;
+    const frameLeft = fragment.outline.x;
+    const frameWidth = fragment.outline.width;
     const headerVariant = fragment.variant === "alt" ? "alt" : "loop";
     const boundHeaderLabel = getBoundTextElement(fragment.header, elementsMap) as
       | (OrderedExcalidrawElement & ExcalidrawTextElement)
@@ -884,10 +898,19 @@ const synchronizeLane = (
   const targetParticipantHeight = shouldOnlyExtendLifeline
     ? originalParticipant?.height ?? SEQUENCE_PARTICIPANT_HEIGHT
     : lane.participant.height;
+  const snapTopY = shouldOnlyExtendLifeline
+    ? undefined
+    : options?.alignmentSnapTopYByLaneKey?.get(lane.key);
+  const laneDeltaY =
+    typeof snapTopY === "number" ? snapTopY - getLaneHeaderTopY(lane) : 0;
   const targetParticipantX = targetCenterX - targetParticipantWidth / 2;
+  const targetParticipantY = shouldOnlyExtendLifeline
+    ? originalParticipant?.y ?? lane.participant.y
+    : lane.participant.y + laneDeltaY;
   if (
     participantMeta?.laneId !== lane.laneId ||
     Math.abs(lane.participant.x - targetParticipantX) > 0.5 ||
+    Math.abs(lane.participant.y - targetParticipantY) > 0.5 ||
     Math.abs(lane.participant.width - targetParticipantWidth) > 0.5 ||
     Math.abs(lane.participant.height - targetParticipantHeight) > 0.5
   ) {
@@ -895,6 +918,7 @@ const synchronizeLane = (
       lane.participant.id,
       newElementWith(lane.participant, {
         x: targetParticipantX,
+        y: targetParticipantY,
         width: targetParticipantWidth,
         height: targetParticipantHeight,
         customData: mergeSequenceMeta(lane.participant, {
@@ -904,7 +928,7 @@ const synchronizeLane = (
     );
   }
 
-  if (Math.abs(laneDeltaX) > 0.5) {
+  if (Math.abs(laneDeltaX) > 0.5 || Math.abs(laneDeltaY) > 0.5) {
     for (const member of lane.members) {
       if (member.id === lane.participant.id || member.id === lane.lifeline.id) {
         continue;
@@ -914,42 +938,54 @@ const synchronizeLane = (
         member.id,
         newElementWith(member, {
           x: member.x + laneDeltaX,
+          y: member.y + laneDeltaY,
         }) as OrderedExcalidrawElement,
       );
     }
   }
 
-  if (participantLabel && shouldOnlyExtendLifeline) {
+  if (participantLabel) {
     const labelText = participantLabel.originalText || participantLabel.text;
-    const metrics = measureSequenceText(labelText);
+    const metrics = shouldOnlyExtendLifeline
+      ? measureSequenceText(labelText)
+      : {
+          width: participantLabel.width,
+          height: participantLabel.height,
+        };
     const nextLabelX =
       targetParticipantX +
       Math.max((targetParticipantWidth - metrics.width) / 2, 0);
     const nextLabelY =
-      lane.participant.y +
-      Math.max((SEQUENCE_PARTICIPANT_HEIGHT - metrics.height) / 2, 0);
+      targetParticipantY +
+      Math.max((targetParticipantHeight - metrics.height) / 2, 0);
 
     if (
-      participantLabel.text !== labelText ||
-      participantLabel.originalText !== labelText ||
-      participantLabel.fontFamily !== SEQUENCE_TEXT_FONT_FAMILY ||
-      Math.abs(participantLabel.fontSize - SEQUENCE_TEXT_FONT_SIZE) > 0.5 ||
-      Math.abs(participantLabel.lineHeight - SEQUENCE_TEXT_LINE_HEIGHT) > 0.001 ||
-      Math.abs(participantLabel.width - metrics.width) > 0.5 ||
-      Math.abs(participantLabel.height - metrics.height) > 0.5 ||
       Math.abs(participantLabel.x - nextLabelX) > 0.5 ||
-      Math.abs(participantLabel.y - nextLabelY) > 0.5
+      Math.abs(participantLabel.y - nextLabelY) > 0.5 ||
+      (shouldOnlyExtendLifeline &&
+        (participantLabel.text !== labelText ||
+          participantLabel.originalText !== labelText ||
+          participantLabel.fontFamily !== SEQUENCE_TEXT_FONT_FAMILY ||
+          Math.abs(participantLabel.fontSize - SEQUENCE_TEXT_FONT_SIZE) > 0.5 ||
+          Math.abs(participantLabel.lineHeight - SEQUENCE_TEXT_LINE_HEIGHT) >
+            0.001 ||
+          Math.abs(participantLabel.width - metrics.width) > 0.5 ||
+          Math.abs(participantLabel.height - metrics.height) > 0.5))
     ) {
       updates.set(
         participantLabel.id,
         newElementWith(participantLabel, {
-          text: labelText,
-          originalText: labelText,
-          fontFamily: SEQUENCE_TEXT_FONT_FAMILY,
-          fontSize: SEQUENCE_TEXT_FONT_SIZE,
-          lineHeight: SEQUENCE_TEXT_LINE_HEIGHT,
-          width: metrics.width,
-          height: metrics.height,
+          ...(shouldOnlyExtendLifeline
+            ? {
+                text: labelText,
+                originalText: labelText,
+                fontFamily: SEQUENCE_TEXT_FONT_FAMILY,
+                fontSize: SEQUENCE_TEXT_FONT_SIZE,
+                lineHeight: SEQUENCE_TEXT_LINE_HEIGHT,
+                width: metrics.width,
+                height: metrics.height,
+              }
+            : null),
           x: nextLabelX,
           y: nextLabelY,
         }) as OrderedExcalidrawElement,
@@ -965,7 +1001,7 @@ const synchronizeLane = (
       ? originalLifeline.y - originalParticipant.y
       : SEQUENCE_PARTICIPANT_HEIGHT
     : lifelineMeta?.topOffset ?? lifeline.y - lane.participant.y;
-  const targetY = lane.participant.y + topOffset;
+  const targetY = targetParticipantY + topOffset;
 
   let targetBottom = shouldOnlyExtendLifeline
     ? Math.max(getElementBottomY(lifeline), targetY + MIN_LIFELINE_HEIGHT)

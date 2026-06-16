@@ -187,7 +187,7 @@ export const applySequenceInsertionContext = ({
   }
 
   if (
-    (kind === "message" || kind === "return") &&
+    (kind === "message" || kind === "async" || kind === "return") &&
     spanFromLaneId &&
     spanToLaneId
   ) {
@@ -215,7 +215,7 @@ export const applySequenceInsertionContext = ({
               ? { fromLaneId: leftLaneId, toLaneId: rightLaneId }
               : { fromLaneId: rightLaneId, toLaneId: leftLaneId };
 
-          return kind === "message"
+          return kind === "message" || kind === "async"
             ? requestLaneIds
             : {
                 fromLaneId: requestLaneIds.toLaneId,
@@ -232,7 +232,12 @@ export const applySequenceInsertionContext = ({
         customData: mergeSequenceMeta(element, {
           fromLaneId: laneIds.fromLaneId,
           toLaneId: laneIds.toLaneId,
-          variant: kind === "return" ? "return" : "message",
+          variant:
+            kind === "return"
+              ? "return"
+              : kind === "async"
+              ? "async"
+              : "message",
         }),
       });
     });

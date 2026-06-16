@@ -5,11 +5,15 @@ import { createSequenceStencil, type SequenceStencilDefaults } from "./sequenceS
 
 const defaults: SequenceStencilDefaults = {
   actor: "角色",
-  participant: "参与者",
   service: "服务",
+  boundary: "边界",
+  control: "控制",
+  entity: "实体",
+  participant: "参与者",
   database: "数据库",
   mq: "消息队列",
   request: "请求",
+  async: "异步",
   response: "响应",
   self: "自调用",
   note: "备注",
@@ -56,6 +60,22 @@ describe("createSequenceStencil", () => {
     expect(message.label.strokeColor).toBe("#1f2328");
   });
 
+  it("creates async messages as solid open arrows", () => {
+    const asyncMessage = createSequenceStencil("async", "light", defaults)[0] as {
+      strokeStyle: string;
+      endArrowhead: string;
+      customData?: {
+        sequenceDiagram?: {
+          variant?: string;
+        };
+      };
+    };
+
+    expect(asyncMessage.strokeStyle).toBe("solid");
+    expect(asyncMessage.endArrowhead).toBe("arrow");
+    expect(asyncMessage.customData?.sequenceDiagram?.variant).toBe("async");
+  });
+
   it("keeps converted arrow labels on the light-theme text color in dark mode", () => {
     const converted = convertToExcalidrawElements(
       createSequenceStencil("message", "dark", defaults),
@@ -73,6 +93,22 @@ describe("createSequenceStencil", () => {
     expect(label?.strokeColor).toBe("#1f2328");
   });
 
+  it("keeps sequence return arrows open while using a solid line", () => {
+    const returnArrow = createSequenceStencil("return", "light", defaults)[0] as {
+      strokeStyle: string;
+      endArrowhead: string;
+      customData?: {
+        sequenceDiagram?: {
+          variant?: string;
+        };
+      };
+    };
+
+    expect(returnArrow.strokeStyle).toBe("dotted");
+    expect(returnArrow.endArrowhead).toBe("arrow");
+    expect(returnArrow.customData?.sequenceDiagram?.variant).toBe("return");
+  });
+
   it("defaults sequence text to Comic Shanns", () => {
     const participant = createSequenceStencil(
       "participant",
@@ -86,5 +122,25 @@ describe("createSequenceStencil", () => {
     );
 
     expect(participant?.label.fontFamily).toBe(FONT_FAMILY["Comic Shanns"]);
+  });
+
+  it("keeps circular participants visually compact", () => {
+    const boundaryElements = convertToExcalidrawElements(
+      createSequenceStencil("boundary", "light", defaults),
+      { regenerateIds: false },
+    );
+
+    const circle = boundaryElements.find(
+      (element) => element.id.startsWith("sequence-participant-"),
+    )!;
+    const label = boundaryElements.find(
+      (element) => element.type === "text" && !element.containerId,
+    )!;
+    const lifeline = boundaryElements.find(
+      (element) => element.id.startsWith("sequence-lifeline-"),
+    )!;
+
+    expect(label.y - (circle.y + circle.height)).toBeLessThanOrEqual(18);
+    expect(lifeline.y - (label.y + label.height)).toBeLessThanOrEqual(12);
   });
 });

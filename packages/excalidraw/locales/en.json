@@ -588,11 +588,15 @@
     },
     "defaults": {
       "actor": "Actor",
-      "participant": "Participant",
       "service": "Service",
+      "boundary": "Boundary",
+      "control": "Control",
+      "entity": "Entity",
+      "participant": "Participant",
       "database": "Database",
       "mq": "Message Queue",
       "request": "request",
+      "async": "async",
       "response": "response",
       "self": "self",
       "note": "Note",
@@ -608,10 +612,6 @@
         "label": "Actor",
         "description": "Stick figure participant with lifeline"
       },
-      "participant": {
-        "label": "Participant",
-        "description": "Simple participant box with lifeline"
-      },
       "service": {
         "label": "Service",
         "description": "Rounded service box with lifeline"
@@ -624,9 +624,29 @@
         "label": "Message Queue",
         "description": "Horizontal message queue cylinder with lifeline"
       },
+      "boundary": {
+        "label": "Boundary",
+        "description": "Boundary participant with lifeline"
+      },
+      "control": {
+        "label": "Control",
+        "description": "Control participant with lifeline"
+      },
+      "entity": {
+        "label": "Entity",
+        "description": "Entity participant with lifeline"
+      },
+      "participant": {
+        "label": "Participant",
+        "description": "Simple participant box with lifeline"
+      },
       "message": {
         "label": "Sync message",
         "description": "Solid call arrow"
+      },
+      "async": {
+        "label": "Async message",
+        "description": "Solid open arrow"
       },
       "return": {
         "label": "Return message",

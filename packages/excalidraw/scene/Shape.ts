@@ -27,6 +27,17 @@ const getDashArrayDashed = (strokeWidth: number) => [8, 8 + strokeWidth];
 
 const getDashArrayDotted = (strokeWidth: number) => [1.5, 6 + strokeWidth];
 
+export const shouldKeepOpenArrowheadSolid = (
+  element: Pick<ExcalidrawLinearElement, "strokeStyle" | "customData">,
+  arrowhead: Arrowhead,
+) => {
+  return (
+    arrowhead === "arrow" &&
+    element.strokeStyle === "dotted" &&
+    element.customData?.sequenceDiagram?.variant === "return"
+  );
+};
+
 function adjustRoughness(element: ExcalidrawElement): number {
   const roughness = element.roughness;
 
@@ -252,7 +263,10 @@ const getArrowheadShapes = (
     default: {
       const [x2, y2, x3, y3, x4, y4] = arrowheadPoints;
 
-      if (element.strokeStyle === "dotted") {
+      if (
+        element.strokeStyle === "dotted" &&
+        !shouldKeepOpenArrowheadSolid(element, arrowhead)
+      ) {
         // for dotted arrows caps, reduce gap to make it more legible
         const dash = getDashArrayDotted(element.strokeWidth - 1);
         options.strokeLineDash = [dash[0], dash[1] - 1];

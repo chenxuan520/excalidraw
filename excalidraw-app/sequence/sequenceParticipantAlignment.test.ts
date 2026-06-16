@@ -4,15 +4,22 @@ import {
   createSequenceStencil,
   type SequenceStencilDefaults,
 } from "./sequenceStencils";
-import { getSequenceParticipantAlignmentGuides } from "./sequenceParticipantAlignment";
+import {
+  getSequenceParticipantAlignmentGuides,
+  getSequenceParticipantAlignmentSnapTargets,
+} from "./sequenceParticipantAlignment";
 
 const defaults: SequenceStencilDefaults = {
   actor: "角色",
-  participant: "参与者",
   service: "服务",
+  boundary: "边界",
+  control: "控制",
+  entity: "实体",
+  participant: "参与者",
   database: "数据库",
   mq: "消息队列",
   request: "请求",
+  async: "异步",
   response: "响应",
   self: "自调用",
   note: "备注",
@@ -46,7 +53,7 @@ describe("getSequenceParticipantAlignmentGuides", () => {
 
     expect(guides).toHaveLength(1);
     expect(guides[0].leftX).toBeLessThan(guides[0].referenceLeftX);
-    expect(guides[0].y).toBe(2);
+    expect(guides[0].y).toBe(0);
   });
 
   it("supports selecting a decorative actor member to resolve the lane", () => {
@@ -73,6 +80,47 @@ describe("getSequenceParticipantAlignmentGuides", () => {
     });
 
     expect(guides).toHaveLength(1);
-    expect(guides[0].y).toBe(1.5);
+    expect(guides[0].y).toBe(3);
+  });
+
+  it("returns snap targets only when a lane is close enough to align", () => {
+    const leftLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+    const nearLane = convertToExcalidrawElements(
+      createSequenceStencil("service", "light", defaults),
+      { regenerateIds: false },
+    ).map((element) => ({
+      ...element,
+      x: element.x + 320,
+      y: element.y + 4,
+    })) as OrderedExcalidrawElement[];
+    const farLane = convertToExcalidrawElements(
+      createSequenceStencil("service", "light", defaults),
+      { regenerateIds: false },
+    ).map((element) => ({
+      ...element,
+      x: element.x + 640,
+      y: element.y + 18,
+    })) as OrderedExcalidrawElement[];
+
+    const nearTargets = getSequenceParticipantAlignmentSnapTargets({
+      elements: [...leftLane, ...nearLane],
+      selectedElementIds: Object.fromEntries(
+        nearLane.map((element) => [element.id, true]),
+      ) as Record<string, true>,
+      zoomValue: 1,
+    });
+    const farTargets = getSequenceParticipantAlignmentSnapTargets({
+      elements: [...leftLane, ...farLane],
+      selectedElementIds: Object.fromEntries(
+        farLane.map((element) => [element.id, true]),
+      ) as Record<string, true>,
+      zoomValue: 1,
+    });
+
+    expect([...nearTargets.values()]).toEqual([0]);
+    expect(farTargets.size).toBe(0);
   });
 });

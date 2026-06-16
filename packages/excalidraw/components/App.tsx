@@ -3161,14 +3161,21 @@ class App extends React.Component<AppProps, AppState> {
     elements: readonly ExcalidrawElement[];
     files: BinaryFiles | null;
     position: { clientX: number; clientY: number } | "cursor" | "center";
+    anchor?: { x: number; y: number };
     retainSeed?: boolean;
     fitToContent?: boolean;
   }) => {
     const elements = restoreElements(opts.elements, null, undefined);
     const [minX, minY, maxX, maxY] = getCommonBounds(elements);
 
-    const elementsCenterX = distance(minX, maxX) / 2;
-    const elementsCenterY = distance(minY, maxY) / 2;
+    const anchorOffsetX =
+      typeof opts.anchor?.x === "number"
+        ? opts.anchor.x - minX
+        : distance(minX, maxX) / 2;
+    const anchorOffsetY =
+      typeof opts.anchor?.y === "number"
+        ? opts.anchor.y - minY
+        : distance(minY, maxY) / 2;
 
     const clientX =
       typeof opts.position === "object"
@@ -3188,8 +3195,8 @@ class App extends React.Component<AppProps, AppState> {
       this.state,
     );
 
-    const dx = x - elementsCenterX;
-    const dy = y - elementsCenterY;
+    const dx = x - anchorOffsetX;
+    const dy = y - anchorOffsetY;
 
     const [gridX, gridY] = getGridPoint(dx, dy, this.state.gridSize);
 
@@ -9402,9 +9409,27 @@ class App extends React.Component<AppProps, AppState> {
     if (libraryJSON && typeof libraryJSON === "string") {
       try {
         const libraryItems = parseLibraryJSON(libraryJSON);
+        const distributedLibraryItems = distributeLibraryItemsOnSquareGrid(
+          libraryItems,
+        );
+        const dragAnchorRaw = event.dataTransfer.getData(
+          MIME_TYPES.excalidrawlibDragAnchor,
+        );
+        const dragAnchor = dragAnchorRaw
+          ? JSON.parse(dragAnchorRaw)
+          : undefined;
+        const [anchorMinX, anchorMinY] = getCommonBounds(distributedLibraryItems);
         this.addElementsFromPasteOrLibrary({
-          elements: distributeLibraryItemsOnSquareGrid(libraryItems),
+          elements: distributedLibraryItems,
           position: event,
+          anchor:
+            typeof dragAnchor?.x === "number" &&
+            typeof dragAnchor?.y === "number"
+              ? {
+                  x: anchorMinX + dragAnchor.x,
+                  y: anchorMinY + dragAnchor.y,
+                }
+              : undefined,
           files: null,
         });
       } catch (error: any) {

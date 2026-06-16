@@ -640,11 +640,15 @@
     },
     "defaults": {
       "actor": "角色",
-      "participant": "参与者",
       "service": "服务",
+      "boundary": "边界",
+      "control": "控制",
+      "entity": "实体",
+      "participant": "参与者",
       "database": "数据库",
       "mq": "消息队列",
       "request": "请求",
+      "async": "异步",
       "response": "响应",
       "self": "自调用",
       "note": "备注",
@@ -660,10 +664,6 @@
         "label": "Actor",
         "description": "带生命线的人物参与者"
       },
-      "participant": {
-        "label": "参与者",
-        "description": "普通参与者框 + 生命线"
-      },
       "service": {
         "label": "服务",
         "description": "圆角服务框 + 生命线"
@@ -676,9 +676,29 @@
         "label": "消息队列",
         "description": "横向圆柱消息队列 + 生命线"
       },
+      "boundary": {
+        "label": "边界",
+        "description": "Boundary 参与者 + 生命线"
+      },
+      "control": {
+        "label": "控制",
+        "description": "Control 参与者 + 生命线"
+      },
+      "entity": {
+        "label": "实体",
+        "description": "Entity 参与者 + 生命线"
+      },
+      "participant": {
+        "label": "参与者",
+        "description": "普通参与者框 + 生命线"
+      },
       "message": {
         "label": "同步消息",
         "description": "实线调用箭头"
+      },
+      "async": {
+        "label": "异步消息",
+        "description": "实线开放箭头"
       },
       "return": {
         "label": "返回消息",

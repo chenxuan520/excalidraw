@@ -494,10 +494,15 @@ const getFreeDrawElementAbsoluteCoords = (
 };
 
 /** @returns number in pixels */
-export const getArrowheadSize = (arrowhead: Arrowhead): number => {
+export const getArrowheadSize = (
+  arrowhead: Arrowhead,
+  element?: Pick<ExcalidrawLinearElement, "customData">,
+): number => {
   switch (arrowhead) {
     case "arrow":
-      return 25;
+      return element?.customData?.sequenceDiagram?.variant === "return"
+        ? 15
+        : 25;
     case "diamond":
     case "diamond_outline":
       return 12;
@@ -570,7 +575,7 @@ export const getArrowheadPoints = (
   const nx = (x2 - x1) / distance;
   const ny = (y2 - y1) / distance;
 
-  const size = getArrowheadSize(arrowhead);
+  const size = getArrowheadSize(arrowhead, element);
 
   let length = 0;
 

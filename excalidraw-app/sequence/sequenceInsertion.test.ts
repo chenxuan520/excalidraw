@@ -17,11 +17,15 @@ import { synchronizeSequenceDiagramElements } from "./sequenceSystem";
 
 const defaults: SequenceStencilDefaults = {
   actor: "角色",
-  participant: "参与者",
   service: "服务",
+  boundary: "边界",
+  control: "控制",
+  entity: "实体",
+  participant: "参与者",
   database: "数据库",
   mq: "消息队列",
   request: "请求",
+  async: "异步",
   response: "响应",
   self: "自调用",
   note: "备注",
@@ -149,6 +153,53 @@ describe("applySequenceInsertionContext", () => {
       fromLaneId: getSequenceLaneId(rightLifeline),
       toLaneId: getSequenceLaneId(leftLifeline),
     });
+  });
+
+  it("uses the request direction switch when inserting async messages across two lanes", () => {
+    const leftLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+    const rightLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ).map((element) => ({
+      ...element,
+      x: element.x + 320,
+    })) as OrderedExcalidrawElement[];
+    const syncedScene = synchronizeSequenceDiagramElements([
+      ...leftLane,
+      ...rightLane,
+    ]);
+    const leftLifeline = syncedScene.elements.find((element) =>
+      isSequenceLifelineElement(element),
+    )!;
+    const rightLifeline = syncedScene.elements
+      .filter((element) => isSequenceLifelineElement(element))
+      .sort((a, b) => a.x - b.x)[1]!;
+    const asyncMessage = convertToExcalidrawElements(
+      createSequenceStencil("async", "light", defaults, {
+        requestDirection: "rtl",
+      }),
+      { regenerateIds: false },
+    );
+
+    const result = applySequenceInsertionContext({
+      kind: "async",
+      elements: asyncMessage,
+      sceneElements: syncedScene.elements,
+      selectedElementIds: {
+        [leftLifeline.id]: true,
+        [rightLifeline.id]: true,
+      },
+      requestDirection: "rtl",
+    });
+
+    expect(getSequenceMessageLaneIds(result[0])).toEqual({
+      fromLaneId: getSequenceLaneId(rightLifeline),
+      toLaneId: getSequenceLaneId(leftLifeline),
+    });
+    expect(getSequenceElementMeta(result[0])?.variant).toBe("async");
   });
 
   it("computes auto message kind from the configured request direction", () => {

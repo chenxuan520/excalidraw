@@ -191,11 +191,15 @@ export const SequenceActivationHandles = ({
   const defaults = useMemo<SequenceStencilDefaults>(
     () => ({
       actor: t("sequenceDiagram.defaults.actor"),
-      participant: t("sequenceDiagram.defaults.participant"),
       service: t("sequenceDiagram.defaults.service"),
+      boundary: t("sequenceDiagram.defaults.boundary"),
+      control: t("sequenceDiagram.defaults.control"),
+      entity: t("sequenceDiagram.defaults.entity"),
+      participant: t("sequenceDiagram.defaults.participant"),
       database: t("sequenceDiagram.defaults.database"),
       mq: t("sequenceDiagram.defaults.mq"),
       request: t("sequenceDiagram.defaults.request"),
+      async: t("sequenceDiagram.defaults.async"),
       response: t("sequenceDiagram.defaults.response"),
       self: t("sequenceDiagram.defaults.self"),
       note: t("sequenceDiagram.defaults.note"),

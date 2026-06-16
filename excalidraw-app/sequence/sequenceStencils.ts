@@ -18,11 +18,15 @@ export const DEFAULT_SEQUENCE_REQUEST_DIRECTION: SequenceRequestDirection =
 
 export type SequenceStencilDefaults = {
   actor: string;
-  participant: string;
   service: string;
+  boundary: string;
+  control: string;
+  entity: string;
+  participant: string;
   database: string;
   mq: string;
   request: string;
+  async: string;
   response: string;
   self: string;
   note: string;
@@ -57,11 +61,15 @@ type SequenceElementMeta = {
 export type SequenceStencilKind =
   | "blank"
   | "actor"
-  | "participant"
   | "service"
+  | "boundary"
+  | "control"
+  | "entity"
+  | "participant"
   | "database"
   | "mq"
   | "message"
+  | "async"
   | "return"
   | "self"
   | "activation"
@@ -84,11 +92,11 @@ export const getSequenceMessageKindForDirection = ({
 };
 
 export const getSequenceMessageReverse = (
-  kind: Extract<SequenceStencilKind, "message" | "return">,
+  kind: Extract<SequenceStencilKind, "message" | "async" | "return">,
   requestDirection: SequenceRequestDirection,
 ) => {
   const requestToRight = requestDirection === "ltr";
-  return kind === "message" ? !requestToRight : requestToRight;
+  return kind === "return" ? requestToRight : !requestToRight;
 };
 
 export const sequenceStencilSections: {
@@ -98,9 +106,17 @@ export const sequenceStencilSections: {
   { key: "templates", items: ["blank"] },
   {
     key: "participants",
-    items: ["actor", "service", "participant", "database", "mq"],
+    items: [
+      "actor",
+      "service",
+      "database",
+      "mq",
+      "boundary",
+      "control",
+      "entity",
+    ],
   },
-  { key: "messages", items: ["message", "return", "self"] },
+  { key: "messages", items: ["message", "async", "return", "self"] },
   { key: "helpers", items: ["activation", "note", "loop", "alt"] },
 ];
 
@@ -131,6 +147,10 @@ const DEFAULT_FONT = getFontString({
 export const SEQUENCE_FRAGMENT_HEADER_HEIGHT = 28;
 export const SEQUENCE_SELF_CALL_HEIGHT = 54;
 const SEQUENCE_FRAGMENT_HEADER_PADDING_X = 12;
+const CIRCULAR_PARTICIPANT_ICON_Y = 6;
+const CIRCULAR_PARTICIPANT_LABEL_Y = 46;
+const CIRCULAR_PARTICIPANT_LABEL_HEIGHT = 24;
+const CIRCULAR_PARTICIPANT_LIFELINE_Y = 76;
 
 const getPalette = (_theme: Theme): Palette => {
   return {
@@ -501,6 +521,149 @@ const createActor = (
   ] as ExcalidrawElementSkeleton[];
 };
 
+const createCircularParticipant = (
+  id: string,
+  x: number,
+  label: string,
+  palette: Palette,
+  decoration: ExcalidrawElementSkeleton[],
+) => {
+  const groupId = createGroupId(id);
+  const laneId = `${id}-lane`;
+  return [
+    {
+      type: "ellipse",
+      id: createSequenceId("participant", laneId),
+      x: x + 34,
+      y: CIRCULAR_PARTICIPANT_ICON_Y,
+      width: 28,
+      height: 28,
+      strokeColor: palette.surfaceStroke,
+      backgroundColor: "transparent",
+      fillStyle: "solid",
+      strokeWidth: 2,
+      roughness: 0,
+      groupIds: [groupId],
+      customData: createSequenceMeta("participant", laneId),
+    },
+    ...decoration.map((element) => ({
+      ...element,
+      groupIds: [groupId],
+    })),
+    createCenteredText({
+      x,
+      y: CIRCULAR_PARTICIPANT_LABEL_Y,
+      width: 96,
+      height: CIRCULAR_PARTICIPANT_LABEL_HEIGHT,
+      label,
+      palette,
+      textColor: palette.surfaceText,
+      groupId,
+    }),
+    createLifeline(laneId, groupId, x + 48, CIRCULAR_PARTICIPANT_LIFELINE_Y, palette),
+  ] as ExcalidrawElementSkeleton[];
+};
+
+const createBoundary = (
+  id: string,
+  x: number,
+  label: string,
+  palette: Palette,
+) => {
+  return createCircularParticipant(id, x, label, palette, [
+    {
+      type: "line",
+      x: x + 30,
+      y: 14,
+      width: 1,
+      height: 14,
+      points: [
+        [0, 0],
+        [0, 14],
+      ],
+      strokeColor: palette.surfaceStroke,
+      strokeWidth: 2,
+      roughness: 0,
+    },
+  ]);
+};
+
+const createControl = (
+  id: string,
+  x: number,
+  label: string,
+  palette: Palette,
+) => {
+  return createCircularParticipant(id, x, label, palette, [
+    {
+      type: "line",
+      x: x + 38,
+      y: 20,
+      width: 12,
+      height: 0,
+      points: [
+        [0, 0],
+        [12, 0],
+      ],
+      strokeColor: palette.surfaceStroke,
+      strokeWidth: 2,
+      roughness: 0,
+    },
+    {
+      type: "line",
+      x: x + 46,
+      y: 16,
+      width: 4,
+      height: 4,
+      points: [
+        [0, 0],
+        [4, 4],
+      ],
+      strokeColor: palette.surfaceStroke,
+      strokeWidth: 2,
+      roughness: 0,
+    },
+    {
+      type: "line",
+      x: x + 46,
+      y: 24,
+      width: 4,
+      height: 4,
+      points: [
+        [0, 0],
+        [4, -4],
+      ],
+      strokeColor: palette.surfaceStroke,
+      strokeWidth: 2,
+      roughness: 0,
+    },
+  ]);
+};
+
+const createEntity = (
+  id: string,
+  x: number,
+  label: string,
+  palette: Palette,
+) => {
+  return createCircularParticipant(id, x, label, palette, [
+    {
+      type: "line",
+      x: x + 30,
+      y: 40,
+      width: 36,
+      height: 0,
+      points: [
+        [0, 0],
+        [36, 0],
+      ],
+      strokeColor: palette.surfaceStroke,
+      strokeWidth: 2,
+      roughness: 0,
+    },
+  ]);
+};
+
 const createDatabase = (
   id: string,
   x: number,
@@ -692,8 +855,17 @@ const createMq = (
 const createMessageArrow = (
   label: string,
   palette: Palette,
-  opts?: { dotted?: boolean; self?: boolean; reverse?: boolean },
+  opts?: {
+    dotted?: boolean;
+    openArrow?: boolean;
+    self?: boolean;
+    reverse?: boolean;
+    variant?: "message" | "async" | "return";
+  },
 ) => {
+  const variant = opts?.self
+    ? "self"
+    : opts?.variant ?? (opts?.dotted ? "return" : "message");
   const base = {
     type: "arrow",
     id: createSequenceId("message"),
@@ -703,13 +875,13 @@ const createMessageArrow = (
     strokeWidth: 2,
     roughness: 0,
     strokeStyle: opts?.dotted ? "dotted" : "solid",
-    endArrowhead: opts?.dotted ? "arrow" : "triangle",
+    endArrowhead: opts?.openArrow || opts?.dotted ? "arrow" : "triangle",
     label: {
       text: label,
       ...makeTextStyle(palette),
     },
     customData: createSequenceMeta("message", undefined, {
-      variant: opts?.self ? "self" : opts?.dotted ? "return" : "message",
+      variant,
     }),
   } as const;
 
@@ -954,6 +1126,12 @@ export const createSequenceStencil = (
       ];
     case "actor":
       return createActor("actor", 0, defaults.actor, palette);
+    case "boundary":
+      return createBoundary("boundary", 0, defaults.boundary, palette);
+    case "control":
+      return createControl("control", 0, defaults.control, palette);
+    case "entity":
+      return createEntity("entity", 0, defaults.entity, palette);
     case "participant":
       return createParticipant("participant", 0, defaults.participant, palette);
     case "service":
@@ -970,13 +1148,24 @@ export const createSequenceStencil = (
       return [
         createMessageArrow(defaults.request, palette, {
           reverse: getSequenceMessageReverse("message", requestDirection),
+          variant: "message",
+        }),
+      ];
+    case "async":
+      return [
+        createMessageArrow(defaults.async, palette, {
+          openArrow: true,
+          reverse: getSequenceMessageReverse("async", requestDirection),
+          variant: "async",
         }),
       ];
     case "return":
       return [
         createMessageArrow(defaults.response, palette, {
           dotted: true,
+          openArrow: true,
           reverse: getSequenceMessageReverse("return", requestDirection),
+          variant: "return",
         }),
       ];
     case "self":

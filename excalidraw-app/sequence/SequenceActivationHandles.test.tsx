@@ -32,11 +32,15 @@ import { SequenceActivationHandles } from "./SequenceActivationHandles";
 
 const defaults: SequenceStencilDefaults = {
   actor: "角色",
-  participant: "参与者",
   service: "服务",
+  boundary: "边界",
+  control: "控制",
+  entity: "实体",
+  participant: "参与者",
   database: "数据库",
   mq: "消息队列",
   request: "请求",
+  async: "异步",
   response: "响应",
   self: "自调用",
   note: "备注",

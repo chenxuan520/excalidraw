@@ -117,6 +117,7 @@ import {
 import { SequenceActivationHandles } from "./sequence/SequenceActivationHandles";
 import { SequenceFragmentHandles } from "./sequence/SequenceFragmentHandles";
 import { SequenceParticipantAlignmentGuides } from "./sequence/SequenceParticipantAlignmentGuides";
+import { getSequenceParticipantAlignmentSnapTargets } from "./sequence/sequenceParticipantAlignment";
 import {
   DEFAULT_SEQUENCE_REQUEST_DIRECTION,
   SEQUENCE_DIAGRAM_SIDEBAR_TAB,
@@ -1408,6 +1409,7 @@ const ExcalidrawWrapper = () => {
       selectedElementIds: AppState["selectedElementIds"],
       storeAction?: "update",
       resizeHandleType?: string | boolean | null,
+      alignmentSnapTopYByLaneKey?: Map<string, number>,
     ) => {
       if (!excalidrawAPI) {
         return false;
@@ -1419,6 +1421,7 @@ const ExcalidrawWrapper = () => {
         {
           resizeHandleType,
           originalElements: sequenceResizeOriginalElementsRef.current,
+          alignmentSnapTopYByLaneKey,
         },
       );
       if (!synced.changed) {
@@ -1474,6 +1477,16 @@ const ExcalidrawWrapper = () => {
           appState.selectedElementIds,
           StoreAction.UPDATE,
           appState.isResizing ? sequenceResizeHandleTypeRef.current : null,
+          appState.selectedElementsAreBeingDragged &&
+            !appState.isResizing &&
+            !appState.viewModeEnabled &&
+            appState.activeTool.type === "selection"
+            ? getSequenceParticipantAlignmentSnapTargets({
+                elements,
+                selectedElementIds: appState.selectedElementIds,
+                zoomValue: appState.zoom.value,
+              })
+            : undefined,
         )
       ) {
         return;
