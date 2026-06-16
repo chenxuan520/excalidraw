@@ -8,6 +8,9 @@ import type {
   OrderedExcalidrawElement,
 } from "../../packages/excalidraw/element/types";
 import {
+  SEQUENCE_ACCENT_FILL,
+  SEQUENCE_FRAGMENT_CONDITION_TEXT,
+  SEQUENCE_FRAGMENT_ELSE_TEXT,
   SEQUENCE_FRAGMENT_HEADER_HEIGHT,
   SEQUENCE_PARTICIPANT_HEIGHT,
   SEQUENCE_SELF_CALL_HEIGHT,
@@ -131,6 +134,40 @@ describe("synchronizeSequenceDiagramElements", () => {
     expect(getSequenceLaneId(syncedActivation!)).toBe(
       getSequenceLaneId(syncedLifeline!),
     );
+  });
+
+  it("normalizes activation bars to the shared sequence accent fill", () => {
+    const laneElements = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+
+    const lifeline = laneElements.find((element) =>
+      isSequenceLifelineElement(element),
+    )!;
+    const activation = convertToExcalidrawElements(
+      createSequenceActivationStencil({
+        centerX: lifeline.x,
+        y: lifeline.y + 48,
+        height: 120,
+        theme: "light",
+        laneId: getSequenceLaneId(lifeline),
+      }),
+      { regenerateIds: false },
+    )[0] as OrderedExcalidrawElement;
+
+    const synced = synchronizeSequenceDiagramElements([
+      ...laneElements,
+      {
+        ...activation,
+        backgroundColor: "#e8eefc",
+      } as OrderedExcalidrawElement,
+    ]);
+    const syncedActivation = synced.elements.find((element) =>
+      isSequenceActivationElement(element),
+    );
+
+    expect(syncedActivation?.backgroundColor).toBe(SEQUENCE_ACCENT_FILL);
   });
 
   it("keeps a bound activation attached when the lane moves", () => {
@@ -917,12 +954,16 @@ describe("synchronizeSequenceDiagramElements", () => {
     const headerLabel = synced.elements.find(
       (element) => element.customData?.sequenceDiagram?.part === "label",
     ) as ExcalidrawTextElement | undefined;
+    const conditionLabel = synced.elements.find(
+      (element) => element.customData?.sequenceDiagram?.part === "condition",
+    ) as ExcalidrawTextElement | undefined;
 
     expect(header.height).toBe(SEQUENCE_FRAGMENT_HEADER_HEIGHT);
     expect(header.y).toBe(outline.y);
     expect(header.width).toBeGreaterThanOrEqual(74);
     expect(headerLabel?.containerId).toBe(null);
     expect(headerLabel?.text).toBe(defaults.loop);
+    expect(conditionLabel?.text).toBe(SEQUENCE_FRAGMENT_CONDITION_TEXT);
   });
 
   it("migrates legacy bound fragment labels into standalone text elements", () => {
@@ -1007,12 +1048,20 @@ describe("synchronizeSequenceDiagramElements", () => {
     const label = synced.elements.find(
       (element) => element.customData?.sequenceDiagram?.part === "label",
     ) as ExcalidrawTextElement | undefined;
+    const conditionLabel = synced.elements.find(
+      (element) => element.customData?.sequenceDiagram?.part === "condition",
+    ) as ExcalidrawTextElement | undefined;
+    const elseLabel = synced.elements.find(
+      (element) => element.customData?.sequenceDiagram?.part === "else",
+    ) as ExcalidrawTextElement | undefined;
 
     expect(header.boundElements?.some((element) => element.type === "text")).toBe(
       false,
     );
     expect(label?.containerId).toBe(null);
     expect(label?.text).toBe(defaults.alt);
+    expect(conditionLabel?.text).toBe(SEQUENCE_FRAGMENT_CONDITION_TEXT);
+    expect(elseLabel?.text).toBe(SEQUENCE_FRAGMENT_ELSE_TEXT);
   });
 
   it("resets enlarged fragment labels back to the default text style", () => {
@@ -1052,10 +1101,15 @@ describe("synchronizeSequenceDiagramElements", () => {
     const label = synced.elements.find(
       (element) => element.customData?.sequenceDiagram?.part === "label",
     ) as ExcalidrawTextElement | undefined;
+    const conditionLabel = synced.elements.find(
+      (element) => element.customData?.sequenceDiagram?.part === "condition",
+    ) as ExcalidrawTextElement | undefined;
 
     expect(label?.fontSize).toBe(SEQUENCE_TEXT_FONT_SIZE);
     expect(label?.lineHeight).toBe(SEQUENCE_TEXT_LINE_HEIGHT);
     expect(label?.width).toBeLessThan(120);
+    expect(conditionLabel?.fontSize).toBe(SEQUENCE_TEXT_FONT_SIZE);
+    expect(conditionLabel?.lineHeight).toBe(SEQUENCE_TEXT_LINE_HEIGHT);
   });
 
   it("updates fragment lane metadata when dragged to another span without snapping frame geometry", () => {

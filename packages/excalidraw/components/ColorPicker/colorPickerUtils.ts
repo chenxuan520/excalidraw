@@ -1,7 +1,7 @@
 import type { ExcalidrawElement } from "../../element/types";
 import { atom } from "jotai";
 import type { ColorPickerColor, ColorPaletteCustom } from "../../colors";
-import { MAX_CUSTOM_COLORS_USED_IN_CANVAS } from "../../colors";
+import { CUSTOM_COLOR_SHADES, MAX_CUSTOM_COLORS_USED_IN_CANVAS } from "../../colors";
 
 export const getColorNameAndShadeFromColor = ({
   palette,
@@ -79,6 +79,38 @@ export const getMostUsedCustomColors = (
     .sort((a, b) => b[1] - a[1])
     .map((c) => c[0])
     .slice(0, MAX_CUSTOM_COLORS_USED_IN_CANVAS);
+};
+
+export const getShadesForColor = ({
+  color,
+  palette,
+}: {
+  color: string;
+  palette: ColorPaletteCustom;
+}) => {
+  const colorObj = getColorNameAndShadeFromColor({ color, palette });
+
+  if (colorObj) {
+    const shades = palette[colorObj.colorName];
+    if (Array.isArray(shades) && colorObj.shade != null) {
+      return {
+        colorName: colorObj.colorName,
+        shades,
+        shade: colorObj.shade,
+      };
+    }
+  }
+
+  const customShades = CUSTOM_COLOR_SHADES[color];
+  if (customShades) {
+    return {
+      colorName: null,
+      shades: customShades,
+      shade: customShades.indexOf(color),
+    };
+  }
+
+  return null;
 };
 
 export type ActiveColorPickerSectionAtomType =

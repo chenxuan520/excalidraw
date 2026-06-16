@@ -16,6 +16,8 @@ export type SequenceRequestDirection = "ltr" | "rtl";
 export const DEFAULT_SEQUENCE_REQUEST_DIRECTION: SequenceRequestDirection =
   "ltr";
 
+export const SEQUENCE_ACCENT_FILL = "#eef3ff";
+
 export type SequenceStencilDefaults = {
   actor: string;
   service: string;
@@ -146,7 +148,11 @@ const DEFAULT_FONT = getFontString({
 });
 export const SEQUENCE_FRAGMENT_HEADER_HEIGHT = 28;
 export const SEQUENCE_SELF_CALL_HEIGHT = 54;
+export const SEQUENCE_FRAGMENT_CONDITION_TEXT = "[Condition]";
+export const SEQUENCE_FRAGMENT_ELSE_TEXT = "[Else]";
 const SEQUENCE_FRAGMENT_HEADER_PADDING_X = 12;
+const SEQUENCE_FRAGMENT_SECTION_PADDING_X = 8;
+const SEQUENCE_FRAGMENT_SECTION_PADDING_Y = 10;
 const CIRCULAR_PARTICIPANT_ICON_Y = 6;
 const CIRCULAR_PARTICIPANT_LABEL_Y = 46;
 const CIRCULAR_PARTICIPANT_LABEL_HEIGHT = 24;
@@ -160,8 +166,8 @@ const getPalette = (_theme: Theme): Palette => {
     surfaceStroke: "#2f3441",
     surfaceText: "#1f2328",
     boxFill: "#ffffff",
-    accentFill: "#eef3ff",
-    activationFill: "#e8eefc",
+    accentFill: SEQUENCE_ACCENT_FILL,
+    activationFill: SEQUENCE_ACCENT_FILL,
     noteFill: "#fff8d9",
     noteStroke: "#ad7a00",
     fragmentStroke: "#94a3b8",
@@ -347,6 +353,33 @@ const createCenteredText = ({
     y: y + Math.max((height - metrics.height) / 2, 0),
     text: label,
     ...makeTextStyle({ ...palette, text: textColor ?? palette.text }),
+    groupIds: [groupId],
+    ...(customData ? { customData } : null),
+  } as ExcalidrawElementSkeleton;
+};
+
+const createFragmentSectionText = ({
+  x,
+  y,
+  label,
+  palette,
+  groupId,
+  customData,
+}: {
+  x: number;
+  y: number;
+  label: string;
+  palette: Palette;
+  groupId: string;
+  customData?: SequenceElementMeta;
+}) => {
+  return {
+    type: "text",
+    id: createSequenceId("fragment"),
+    x,
+    y,
+    text: label,
+    ...makeTextStyle({ ...palette, text: palette.surfaceText }),
     groupIds: [groupId],
     ...(customData ? { customData } : null),
   } as ExcalidrawElementSkeleton;
@@ -1072,6 +1105,17 @@ const createFragment = (
         part: "label",
       }),
     }),
+    createFragmentSectionText({
+      x: SEQUENCE_FRAGMENT_SECTION_PADDING_X,
+      y: SEQUENCE_FRAGMENT_HEADER_HEIGHT + SEQUENCE_FRAGMENT_SECTION_PADDING_Y,
+      label: SEQUENCE_FRAGMENT_CONDITION_TEXT,
+      palette,
+      groupId: fragmentGroupId,
+      customData: createSequenceMeta("fragment", undefined, {
+        variant: kind,
+        part: "condition",
+      }),
+    }),
   ];
 
   if (kind === "alt") {
@@ -1096,6 +1140,19 @@ const createFragment = (
         offsetY: 72,
       }),
     });
+    elements.push(
+      createFragmentSectionText({
+        x: SEQUENCE_FRAGMENT_SECTION_PADDING_X,
+        y: 72 + SEQUENCE_FRAGMENT_SECTION_PADDING_Y,
+        label: SEQUENCE_FRAGMENT_ELSE_TEXT,
+        palette,
+        groupId: fragmentGroupId,
+        customData: createSequenceMeta("fragment", undefined, {
+          variant: kind,
+          part: "else",
+        }),
+      }),
+    );
   }
 
   return elements;

@@ -1,8 +1,10 @@
 import { newElementWith } from "../../packages/excalidraw/element/mutateElement";
+import { newTextElement } from "../../packages/excalidraw/element/newElement";
 import {
   getBoundTextElement,
   measureTextElement,
 } from "../../packages/excalidraw/element/textElement";
+import { syncInvalidIndices } from "../../packages/excalidraw/fractionalIndex";
 import type {
   ExcalidrawElement,
   ExcalidrawLinearElement,
@@ -24,6 +26,9 @@ import {
   isSequenceNoteElement,
   isSequenceParticipantElement,
   SEQUENCE_FRAGMENT_HEADER_HEIGHT,
+  SEQUENCE_ACCENT_FILL,
+  SEQUENCE_FRAGMENT_CONDITION_TEXT,
+  SEQUENCE_FRAGMENT_ELSE_TEXT,
   SEQUENCE_PARTICIPANT_HEIGHT,
   SEQUENCE_SELF_CALL_HEIGHT,
   SEQUENCE_TEXT_FONT_FAMILY,
@@ -62,11 +67,16 @@ type SequenceFragment = {
   outline: OrderedExcalidrawElement | null;
   header: OrderedExcalidrawElement | null;
   label: (OrderedExcalidrawElement & ExcalidrawTextElement) | null;
+  conditionLabel: (OrderedExcalidrawElement & ExcalidrawTextElement) | null;
+  elseLabel: (OrderedExcalidrawElement & ExcalidrawTextElement) | null;
   divider: (OrderedExcalidrawElement & ExcalidrawLinearElement) | null;
   dividerOffsetY?: number;
   fromLaneId?: string;
   toLaneId?: string;
 };
+
+const SEQUENCE_FRAGMENT_SECTION_PADDING_X = 8;
+const SEQUENCE_FRAGMENT_SECTION_PADDING_Y = 10;
 
 const getElementCenterX = (element: Pick<ExcalidrawElement, "x" | "width">) => {
   return element.x + element.width / 2;
@@ -196,6 +206,8 @@ const buildSequenceLanes = (elements: readonly OrderedExcalidrawElement[]) => {
         outline: null,
         header: null,
         label: null,
+        conditionLabel: null,
+        elseLabel: null,
         divider: null,
         dividerOffsetY: fragmentMeta?.offsetY,
         fromLaneId: fragmentMeta?.fromLaneId,
@@ -210,6 +222,11 @@ const buildSequenceLanes = (elements: readonly OrderedExcalidrawElement[]) => {
         fragment.header = fragmentElement;
       } else if (fragmentMeta?.part === "label") {
         fragment.label = fragmentElement as SequenceFragment["label"];
+      } else if (fragmentMeta?.part === "condition") {
+        fragment.conditionLabel =
+          fragmentElement as SequenceFragment["conditionLabel"];
+      } else if (fragmentMeta?.part === "else") {
+        fragment.elseLabel = fragmentElement as SequenceFragment["elseLabel"];
       } else if (fragmentMeta?.part === "divider") {
         fragment.divider = fragmentElement as SequenceFragment["divider"];
         fragment.dividerOffsetY =
@@ -517,6 +534,49 @@ const synchronizeMessages = (
   return updates;
 };
 
+const createFragmentSectionLabel = ({
+  fragment,
+  text,
+  x,
+  y,
+  part,
+  strokeColor,
+  fromLaneId,
+  toLaneId,
+}: {
+  fragment: SequenceFragment;
+  text: string;
+  x: number;
+  y: number;
+  part: "condition" | "else";
+  strokeColor: string;
+  fromLaneId: string;
+  toLaneId: string;
+}) => {
+  return newTextElement({
+    x,
+    y,
+    text,
+    originalText: text,
+    fontFamily: SEQUENCE_TEXT_FONT_FAMILY,
+    fontSize: SEQUENCE_TEXT_FONT_SIZE,
+    lineHeight: SEQUENCE_TEXT_LINE_HEIGHT,
+    autoResize: true,
+    containerId: null,
+    strokeColor,
+    groupIds: fragment.header?.groupIds || fragment.outline?.groupIds || [],
+    customData: {
+      sequenceDiagram: {
+        role: "fragment",
+        variant: fragment.variant,
+        part,
+        fromLaneId,
+        toLaneId,
+      },
+    },
+  }) as OrderedExcalidrawElement;
+};
+
 const synchronizeFragments = (
   lanes: Map<string, SequenceLane>,
   fragments: Map<string, SequenceFragment>,
@@ -525,6 +585,7 @@ const synchronizeFragments = (
   options?: SequenceSyncOptions,
 ) => {
   const updates = new Map<string, OrderedExcalidrawElement>();
+  const inserted: OrderedExcalidrawElement[] = [];
   const laneList = [...lanes.values()].filter(
     (lane) => lane.participant || lane.lifeline,
   );
@@ -538,6 +599,8 @@ const synchronizeFragments = (
       selectedElementIds?.[fragment.outline.id] ||
       selectedElementIds?.[fragment.header.id] ||
       (fragment.label && selectedElementIds?.[fragment.label.id]) ||
+      (fragment.conditionLabel && selectedElementIds?.[fragment.conditionLabel.id]) ||
+      (fragment.elseLabel && selectedElementIds?.[fragment.elseLabel.id]) ||
       (fragment.divider && selectedElementIds?.[fragment.divider.id])
     );
     const left = fragment.outline.x;
@@ -687,6 +750,78 @@ const synchronizeFragments = (
       }
     }
 
+    const sectionTextColor = headerLabel?.strokeColor || "#1f2328";
+    const conditionLabel = fragment.conditionLabel;
+    const conditionText =
+      conditionLabel?.originalText ||
+      conditionLabel?.text ||
+      SEQUENCE_FRAGMENT_CONDITION_TEXT;
+    const conditionTextMetrics = measureSequenceText(conditionText);
+    const nextConditionX = frameLeft + SEQUENCE_FRAGMENT_SECTION_PADDING_X;
+    const nextConditionY =
+      fragment.outline.y +
+      SEQUENCE_FRAGMENT_HEADER_HEIGHT +
+      SEQUENCE_FRAGMENT_SECTION_PADDING_Y;
+
+    if (conditionLabel) {
+      const nextConditionLabel = newElementWith(conditionLabel, {
+        text: conditionText,
+        originalText: conditionText,
+        x: nextConditionX,
+        y: nextConditionY,
+        width: conditionTextMetrics.width,
+        height: conditionTextMetrics.height,
+        fontFamily: SEQUENCE_TEXT_FONT_FAMILY,
+        fontSize: SEQUENCE_TEXT_FONT_SIZE,
+        lineHeight: SEQUENCE_TEXT_LINE_HEIGHT,
+        autoResize: true,
+        containerId: null,
+        strokeColor: sectionTextColor,
+        groupIds: fragment.header.groupIds,
+        customData: {
+          ...conditionLabel.customData,
+          sequenceDiagram: {
+            role: "fragment",
+            variant: fragment.variant,
+            part: "condition",
+            fromLaneId: fromLane.laneId,
+            toLaneId: toLane.laneId,
+          },
+        },
+      }) as OrderedExcalidrawElement;
+
+      if (
+        conditionLabel.containerId !== null ||
+        conditionLabel.text !== conditionText ||
+        conditionLabel.originalText !== conditionText ||
+        Math.abs(conditionLabel.width - conditionTextMetrics.width) > 0.5 ||
+        Math.abs(conditionLabel.height - conditionTextMetrics.height) > 0.5 ||
+        conditionLabel.fontFamily !== SEQUENCE_TEXT_FONT_FAMILY ||
+        Math.abs(conditionLabel.fontSize - SEQUENCE_TEXT_FONT_SIZE) > 0.5 ||
+        Math.abs(conditionLabel.lineHeight - SEQUENCE_TEXT_LINE_HEIGHT) > 0.001 ||
+        Math.abs(conditionLabel.x - nextConditionX) > 0.5 ||
+        Math.abs(conditionLabel.y - nextConditionY) > 0.5 ||
+        getSequenceElementMeta(conditionLabel)?.part !== "condition" ||
+        getSequenceElementMeta(conditionLabel)?.fromLaneId !== fromLane.laneId ||
+        getSequenceElementMeta(conditionLabel)?.toLaneId !== toLane.laneId
+      ) {
+        updates.set(conditionLabel.id, nextConditionLabel);
+      }
+    } else {
+      inserted.push(
+        createFragmentSectionLabel({
+          fragment,
+          text: conditionText,
+          x: nextConditionX,
+          y: nextConditionY,
+          part: "condition",
+          strokeColor: sectionTextColor,
+          fromLaneId: fromLane.laneId,
+          toLaneId: toLane.laneId,
+        }),
+      );
+    }
+
     if (fragment.variant === "alt" && fragment.divider) {
       const dividerMinOffsetY = SEQUENCE_FRAGMENT_HEADER_HEIGHT + 18;
       const dividerMaxOffsetY = Math.max(
@@ -733,10 +868,76 @@ const synchronizeFragments = (
           }) as OrderedExcalidrawElement,
         );
       }
+
+      const elseLabel = fragment.elseLabel;
+      const elseText =
+        elseLabel?.originalText || elseLabel?.text || SEQUENCE_FRAGMENT_ELSE_TEXT;
+      const elseTextMetrics = measureSequenceText(elseText);
+      const nextElseX = frameLeft + SEQUENCE_FRAGMENT_SECTION_PADDING_X;
+      const nextElseY = dividerY + SEQUENCE_FRAGMENT_SECTION_PADDING_Y;
+
+      if (elseLabel) {
+        const nextElseLabel = newElementWith(elseLabel, {
+          text: elseText,
+          originalText: elseText,
+          x: nextElseX,
+          y: nextElseY,
+          width: elseTextMetrics.width,
+          height: elseTextMetrics.height,
+          fontFamily: SEQUENCE_TEXT_FONT_FAMILY,
+          fontSize: SEQUENCE_TEXT_FONT_SIZE,
+          lineHeight: SEQUENCE_TEXT_LINE_HEIGHT,
+          autoResize: true,
+          containerId: null,
+          strokeColor: sectionTextColor,
+          groupIds: fragment.header.groupIds,
+          customData: {
+            ...elseLabel.customData,
+            sequenceDiagram: {
+              role: "fragment",
+              variant: fragment.variant,
+              part: "else",
+              fromLaneId: fromLane.laneId,
+              toLaneId: toLane.laneId,
+            },
+          },
+        }) as OrderedExcalidrawElement;
+
+        if (
+          elseLabel.containerId !== null ||
+          elseLabel.text !== elseText ||
+          elseLabel.originalText !== elseText ||
+          Math.abs(elseLabel.width - elseTextMetrics.width) > 0.5 ||
+          Math.abs(elseLabel.height - elseTextMetrics.height) > 0.5 ||
+          elseLabel.fontFamily !== SEQUENCE_TEXT_FONT_FAMILY ||
+          Math.abs(elseLabel.fontSize - SEQUENCE_TEXT_FONT_SIZE) > 0.5 ||
+          Math.abs(elseLabel.lineHeight - SEQUENCE_TEXT_LINE_HEIGHT) > 0.001 ||
+          Math.abs(elseLabel.x - nextElseX) > 0.5 ||
+          Math.abs(elseLabel.y - nextElseY) > 0.5 ||
+          getSequenceElementMeta(elseLabel)?.part !== "else" ||
+          getSequenceElementMeta(elseLabel)?.fromLaneId !== fromLane.laneId ||
+          getSequenceElementMeta(elseLabel)?.toLaneId !== toLane.laneId
+        ) {
+          updates.set(elseLabel.id, nextElseLabel);
+        }
+      } else {
+        inserted.push(
+          createFragmentSectionLabel({
+            fragment,
+            text: elseText,
+            x: nextElseX,
+            y: nextElseY,
+            part: "else",
+            strokeColor: sectionTextColor,
+            fromLaneId: fromLane.laneId,
+            toLaneId: toLane.laneId,
+          }),
+        );
+      }
     }
   }
 
-  return updates;
+  return { updates, inserted };
 };
 
 const bindActivations = (
@@ -776,10 +977,12 @@ const bindActivations = (
 
     if (
       Math.abs(targetX - activation.x) > 0.5 ||
-      activationMeta?.laneId !== targetLane.laneId
+      activationMeta?.laneId !== targetLane.laneId ||
+      activation.backgroundColor !== SEQUENCE_ACCENT_FILL
     ) {
       const nextActivation = newElementWith(activation, {
         x: targetX,
+        backgroundColor: SEQUENCE_ACCENT_FILL,
         customData: mergeSequenceMeta(activation, {
           laneId: targetLane.laneId,
         }),
@@ -1017,12 +1220,14 @@ const synchronizeLane = (
     const targetX = targetCenterX - activation.width / 2;
     if (
       Math.abs(targetX - activation.x) > 0.5 ||
-      getSequenceLaneId(activation) !== lane.laneId
+      getSequenceLaneId(activation) !== lane.laneId ||
+      activation.backgroundColor !== SEQUENCE_ACCENT_FILL
     ) {
       updates.set(
         activation.id,
         newElementWith(activation, {
           x: targetX,
+          backgroundColor: SEQUENCE_ACCENT_FILL,
           customData: mergeSequenceMeta(activation, {
             laneId: lane.laneId,
           }),
@@ -1085,13 +1290,14 @@ export const synchronizeSequenceDiagramElements = (
   );
   messageUpdates.forEach((value, key) => updates.set(key, value));
 
-  const fragmentUpdates = synchronizeFragments(
-    lanes,
-    fragments,
-    selectedElementIds,
-    elementsMap,
-    options,
-  );
+  const { updates: fragmentUpdates, inserted: insertedFragmentElements } =
+    synchronizeFragments(
+      lanes,
+      fragments,
+      selectedElementIds,
+      elementsMap,
+      options,
+    );
   fragmentUpdates.forEach((value, key) => updates.set(key, value));
 
   const noteUpdates = synchronizeNotes(lanes, notes, selectedElementIds);
@@ -1107,12 +1313,16 @@ export const synchronizeSequenceDiagramElements = (
     laneUpdates.forEach((value, key) => updates.set(key, value));
   }
 
-  if (!updates.size) {
+  if (!updates.size && !insertedFragmentElements.length) {
     return { changed: false as const, elements };
   }
 
+  const nextElements = elements.map((element) => updates.get(element.id) || element);
+
   return {
     changed: true as const,
-    elements: elements.map((element) => updates.get(element.id) || element),
+    elements: insertedFragmentElements.length
+      ? syncInvalidIndices([...nextElements, ...insertedFragmentElements])
+      : nextElements,
   };
 };

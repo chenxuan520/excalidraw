@@ -41,7 +41,7 @@ export const CANVAS_PALETTE_SHADE_INDEXES = [0, 1, 2, 3, 4] as const;
 export const getSpecificColorShades = (
   color: Exclude<
     ColorPickerColor,
-    "transparent" | "white" | "black" | "bronze"
+    "transparent" | "white" | "black" | "bronze" | "sequence"
   >,
   indexArr: Readonly<ColorShadesIndexes>,
 ) => {
@@ -67,6 +67,18 @@ export const COLOR_PALETTE = {
   // radix bronze shades 3,5,7,9,11
   bronze: ["#f8f1ee", "#eaddd7", "#d2bab0", "#a18072", "#846358"],
 } as ColorPalette;
+
+export const SEQUENCE_CUSTOM_COLOR_SHADES = [
+  "#f7f9ff",
+  "#eef3ff",
+  "#dde7fb",
+  "#c7d7f8",
+  "#afc2f2",
+] as const satisfies ColorTuple;
+
+export const CUSTOM_COLOR_SHADES = Object.fromEntries(
+  SEQUENCE_CUSTOM_COLOR_SHADES.map((color) => [color, SEQUENCE_CUSTOM_COLOR_SHADES]),
+) as Record<string, ColorTuple>;
 
 const COMMON_ELEMENT_SHADES = pick(COLOR_PALETTE, [
   "cyan",

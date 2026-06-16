@@ -119,6 +119,9 @@ import { SequenceFragmentHandles } from "./sequence/SequenceFragmentHandles";
 import { SequenceParticipantAlignmentGuides } from "./sequence/SequenceParticipantAlignmentGuides";
 import { getSequenceParticipantAlignmentSnapTargets } from "./sequence/sequenceParticipantAlignment";
 import {
+  replaceManagedDefaultLibraryItems,
+} from "./defaultLibraryItems";
+import {
   DEFAULT_SEQUENCE_REQUEST_DIRECTION,
   SEQUENCE_DIAGRAM_SIDEBAR_TAB,
   type SequenceRequestDirection,
@@ -401,6 +404,7 @@ const ExcalidrawWrapper = () => {
     importWebDAVConfigFromLocalStorage(),
   );
   const isApplyingSequenceSyncRef = useRef(false);
+  const isDefaultLibrarySeedPendingRef = useRef(false);
   const sequenceResizeHandleTypeRef = useRef<string | boolean | null>(null);
   const sequenceResizeOriginalElementsRef = useRef<Map<string, any> | null>(
     null,
@@ -463,6 +467,27 @@ const ExcalidrawWrapper = () => {
     // TODO maybe remove this in several months (shipped: 24-03-11)
     migrationAdapter: LibraryLocalStorageMigrationAdapter,
   });
+
+  useEffect(() => {
+    if (!excalidrawAPI || isDefaultLibrarySeedPendingRef.current) {
+      return;
+    }
+
+    isDefaultLibrarySeedPendingRef.current = true;
+
+    excalidrawAPI
+      .updateLibrary({
+        libraryItems: (currentLibraryItems) =>
+          replaceManagedDefaultLibraryItems(currentLibraryItems, langCode),
+      })
+      .then(() => {
+        isDefaultLibrarySeedPendingRef.current = false;
+      })
+      .catch((error) => {
+        console.error("Failed to seed default library items", error);
+        isDefaultLibrarySeedPendingRef.current = false;
+      });
+  }, [excalidrawAPI, langCode]);
 
   const refreshWebDAVFiles = useCallback(
     async (config = webdavSession.config) => {

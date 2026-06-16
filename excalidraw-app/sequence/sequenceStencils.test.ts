@@ -1,7 +1,13 @@
 import { convertToExcalidrawElements } from "../../packages/excalidraw";
 import { FONT_FAMILY } from "../../packages/excalidraw/constants";
 import type { ExcalidrawElementSkeleton } from "../../packages/excalidraw/data/transform";
-import { createSequenceStencil, type SequenceStencilDefaults } from "./sequenceStencils";
+import {
+  SEQUENCE_ACCENT_FILL,
+  SEQUENCE_FRAGMENT_CONDITION_TEXT,
+  SEQUENCE_FRAGMENT_ELSE_TEXT,
+  createSequenceStencil,
+  type SequenceStencilDefaults,
+} from "./sequenceStencils";
 
 const defaults: SequenceStencilDefaults = {
   actor: "角色",
@@ -74,6 +80,44 @@ describe("createSequenceStencil", () => {
     expect(asyncMessage.strokeStyle).toBe("solid");
     expect(asyncMessage.endArrowhead).toBe("arrow");
     expect(asyncMessage.customData?.sequenceDiagram?.variant).toBe("async");
+  });
+
+  it("uses one shared accent fill for activations", () => {
+    const activation = createSequenceStencil("activation", "light", defaults)[0] as {
+      backgroundColor: string;
+    };
+
+    expect(activation.backgroundColor).toBe(SEQUENCE_ACCENT_FILL);
+  });
+
+  it("creates loop and alt placeholder labels", () => {
+    const loop = createSequenceStencil("loop", "light", defaults);
+    const alt = createSequenceStencil("alt", "light", defaults);
+
+    expect(
+      loop.some(
+        (element) =>
+          element.type === "text" &&
+          element.customData?.sequenceDiagram?.part === "condition" &&
+          element.text === SEQUENCE_FRAGMENT_CONDITION_TEXT,
+      ),
+    ).toBe(true);
+    expect(
+      alt.some(
+        (element) =>
+          element.type === "text" &&
+          element.customData?.sequenceDiagram?.part === "condition" &&
+          element.text === SEQUENCE_FRAGMENT_CONDITION_TEXT,
+      ),
+    ).toBe(true);
+    expect(
+      alt.some(
+        (element) =>
+          element.type === "text" &&
+          element.customData?.sequenceDiagram?.part === "else" &&
+          element.text === SEQUENCE_FRAGMENT_ELSE_TEXT,
+      ),
+    ).toBe(true);
   });
 
   it("keeps converted arrow labels on the light-theme text color in dark mode", () => {
