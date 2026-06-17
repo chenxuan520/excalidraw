@@ -1,7 +1,17 @@
+import { FONT_FAMILY } from "../packages/excalidraw/constants";
+import type { ExcalidrawTextElement } from "../packages/excalidraw/element/types";
 import {
   getDefaultLibraryItems,
   replaceManagedDefaultLibraryItems,
 } from "./defaultLibraryItems";
+
+const getTextElement = (
+  elements: ReturnType<typeof getDefaultLibraryItems>[number]["elements"],
+) => {
+  return elements.find(
+    (element): element is ExcalidrawTextElement => element.type === "text",
+  );
+};
 
 describe("defaultLibraryItems", () => {
   it("creates the requested built-in library shapes", () => {
@@ -19,6 +29,37 @@ describe("defaultLibraryItems", () => {
     ]);
   });
 
+  it("uses localized english names and labels from i18n keys", () => {
+    const items = getDefaultLibraryItems("en");
+
+    expect(items.map((item) => item.name)).toEqual([
+      "Star",
+      "Triangle",
+      "Left arrow",
+      "Right arrow",
+      "Bidirectional arrow",
+      "Cloud",
+      "Database",
+      "Message Queue",
+    ]);
+    expect(
+      items
+        .find((item) => item.id === "default-library-database")
+        ?.elements.find(
+          (element): element is ExcalidrawTextElement => element.type === "text",
+        )
+        ?.text,
+    ).toBe("Database");
+    expect(
+      items
+        .find((item) => item.id === "default-library-message-queue")
+        ?.elements.find(
+          (element): element is ExcalidrawTextElement => element.type === "text",
+        )
+        ?.text,
+    ).toBe("Queue");
+  });
+
   it("uses stable ids and plain excalidraw elements", () => {
     const first = getDefaultLibraryItems("en");
     const second = getDefaultLibraryItems("en");
@@ -30,6 +71,19 @@ describe("defaultLibraryItems", () => {
     expect(
       first.flatMap((item) => item.elements).every((element) => !element.customData),
     ).toBe(true);
+  });
+
+  it("defaults database and message queue labels to Comic Shanns", () => {
+    const items = getDefaultLibraryItems("zh-CN");
+    const databaseLabel = getTextElement(
+      items.find((item) => item.id === "default-library-database")!.elements,
+    );
+    const messageQueueLabel = getTextElement(
+      items.find((item) => item.id === "default-library-message-queue")!.elements,
+    );
+
+    expect(databaseLabel?.fontFamily).toBe(FONT_FAMILY["Comic Shanns"]);
+    expect(messageQueueLabel?.fontFamily).toBe(FONT_FAMILY["Comic Shanns"]);
   });
 
   it("keeps built-in library shapes unfilled by default", () => {

@@ -1,5 +1,8 @@
 import { convertToExcalidrawElements } from "../../packages/excalidraw";
-import { getSequenceDragAnchor } from "./SequenceDiagramSidebar";
+import {
+  getSequenceDragAnchor,
+  getSequencePasteAnchor,
+} from "./SequenceDiagramSidebar";
 import {
   createSequenceStencil,
   type SequenceStencilDefaults,
@@ -55,5 +58,36 @@ describe("getSequenceDragAnchor", () => {
     );
 
     expect(getSequenceDragAnchor("message", messageElements)).toBeUndefined();
+  });
+
+  it("uses the top center for pasted single-lane participants", () => {
+    const participantElements = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    );
+
+    expect(getSequencePasteAnchor(participantElements)).toEqual({
+      x: 70,
+      y: 0,
+    });
+  });
+
+  it("uses the top center for pasted multi-lane participants", () => {
+    const leftLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    );
+    const rightLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ).map((element) => ({
+      ...element,
+      x: element.x + 320,
+    }));
+
+    expect(getSequencePasteAnchor([...leftLane, ...rightLane])).toEqual({
+      x: 230,
+      y: 0,
+    });
   });
 });

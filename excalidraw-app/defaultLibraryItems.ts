@@ -2,6 +2,8 @@ import {
   DEFAULT_ELEMENT_PROPS,
   FONT_FAMILY,
 } from "../packages/excalidraw/constants";
+import enLocale from "../packages/excalidraw/locales/en.json";
+import zhCNLocale from "../packages/excalidraw/locales/zh-CN.json";
 import {
   convertToExcalidrawElements,
   type ExcalidrawElementSkeleton,
@@ -12,7 +14,7 @@ import type { LibraryItem, LibraryItems } from "../packages/excalidraw/types";
 import { getFontString } from "../packages/excalidraw/utils";
 
 const DEFAULT_LIBRARY_STROKE = DEFAULT_ELEMENT_PROPS.strokeColor;
-const DEFAULT_LIBRARY_TEXT_FONT_FAMILY = FONT_FAMILY.Helvetica;
+const DEFAULT_LIBRARY_TEXT_FONT_FAMILY = FONT_FAMILY["Comic Shanns"];
 const DEFAULT_LIBRARY_TEXT_FONT_SIZE = 18;
 const DEFAULT_LIBRARY_TEXT_LINE_HEIGHT = getLineHeight(
   DEFAULT_LIBRARY_TEXT_FONT_FAMILY,
@@ -43,6 +45,36 @@ export const MANAGED_DEFAULT_LIBRARY_ITEM_IDS = new Set<string>([
   makeItemId("message-queue"),
   ...LEGACY_REMOVED_DEFAULT_LIBRARY_ITEM_IDS,
 ]);
+
+const getNestedLocaleValue = (
+  locale: Record<string, unknown>,
+  path: string,
+) => {
+  return path.split(".").reduce<unknown>((acc, key) => {
+    if (!acc || typeof acc !== "object" || !(key in acc)) {
+      return undefined;
+    }
+    return (acc as Record<string, unknown>)[key];
+  }, locale);
+};
+
+const getDefaultLibraryLocale = (langCode: string) => {
+  return langCode.startsWith("zh") ? zhCNLocale : enLocale;
+};
+
+const getDefaultLibraryText = (langCode: string, path: string) => {
+  const localized = getNestedLocaleValue(getDefaultLibraryLocale(langCode), path);
+  if (typeof localized === "string") {
+    return localized;
+  }
+
+  const fallback = getNestedLocaleValue(enLocale, path);
+  if (typeof fallback === "string") {
+    return fallback;
+  }
+
+  throw new Error(`Missing default library i18n key: ${path}`);
+};
 
 const makeBaseSkeleton = (id: string, seed: number) => ({
   id,
@@ -395,32 +427,38 @@ const createMessageQueueItem = (name: string, label: string) => {
 };
 
 const getDefaultLibraryItemNames = (langCode: string) => {
-  if (langCode.startsWith("zh")) {
-    return {
-      star: "星形",
-      triangle: "三角形",
-      leftArrow: "左箭头",
-      rightArrow: "右箭头",
-      bidirectionalArrow: "双向箭头",
-      cloud: "云朵",
-      database: "数据库",
-      databaseLabel: "数据库",
-      messageQueue: "消息队列",
-      messageQueueLabel: "消息队列",
-    };
-  }
-
   return {
-    star: "Star",
-    triangle: "Triangle",
-    leftArrow: "Left arrow",
-    rightArrow: "Right arrow",
-    bidirectionalArrow: "Bidirectional arrow",
-    cloud: "Cloud",
-    database: "Database",
-    databaseLabel: "Database",
-    messageQueue: "Message Queue",
-    messageQueueLabel: "Queue",
+    star: getDefaultLibraryText(langCode, "defaultLibraryItems.star.name"),
+    triangle: getDefaultLibraryText(langCode, "defaultLibraryItems.triangle.name"),
+    leftArrow: getDefaultLibraryText(
+      langCode,
+      "defaultLibraryItems.leftArrow.name",
+    ),
+    rightArrow: getDefaultLibraryText(
+      langCode,
+      "defaultLibraryItems.rightArrow.name",
+    ),
+    bidirectionalArrow: getDefaultLibraryText(
+      langCode,
+      "defaultLibraryItems.bidirectionalArrow.name",
+    ),
+    cloud: getDefaultLibraryText(langCode, "defaultLibraryItems.cloud.name"),
+    database: getDefaultLibraryText(
+      langCode,
+      "defaultLibraryItems.database.name",
+    ),
+    databaseLabel: getDefaultLibraryText(
+      langCode,
+      "defaultLibraryItems.database.label",
+    ),
+    messageQueue: getDefaultLibraryText(
+      langCode,
+      "defaultLibraryItems.messageQueue.name",
+    ),
+    messageQueueLabel: getDefaultLibraryText(
+      langCode,
+      "defaultLibraryItems.messageQueue.label",
+    ),
   };
 };
 

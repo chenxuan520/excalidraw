@@ -1,4 +1,5 @@
 import { convertToExcalidrawElements } from "../../packages/excalidraw";
+import { FONT_FAMILY } from "../../packages/excalidraw/constants";
 import type { ExcalidrawElementSkeleton } from "../../packages/excalidraw/data/transform";
 import { newElementWith } from "../../packages/excalidraw/element/mutateElement";
 import type {
@@ -1132,7 +1133,7 @@ describe("synchronizeSequenceDiagramElements", () => {
     expect(elseLabel?.text).toBe(SEQUENCE_FRAGMENT_ELSE_TEXT);
   });
 
-  it("resets enlarged fragment labels back to the default text style", () => {
+  it("preserves manually changed alt fragment text styles while resizing", () => {
     const leftLane = convertToExcalidrawElements(
       createSequenceStencil("participant", "light", defaults),
       { regenerateIds: false },
@@ -1145,39 +1146,112 @@ describe("synchronizeSequenceDiagramElements", () => {
       x: element.x + 320,
     })) as OrderedExcalidrawElement[];
     const fragment = convertToExcalidrawElements(
-      createSequenceStencil("loop", "light", defaults),
+      createSequenceStencil("alt", "light", defaults),
       { regenerateIds: false },
-    ).map((element) => {
-      if (element.customData?.sequenceDiagram?.part !== "label") {
-        return element;
+    ) as OrderedExcalidrawElement[];
+
+    const resizedFragment = fragment.map((element) => {
+      const part = element.customData?.sequenceDiagram?.part;
+      if (part === "label") {
+        return {
+          ...element,
+          fontFamily: FONT_FAMILY.Helvetica,
+          fontSize: 44,
+          lineHeight: 1.7,
+          width: element.width * 2,
+          height: element.height * 2,
+        } as OrderedExcalidrawElement;
       }
 
-      return {
-        ...element,
-        fontSize: 44,
-        lineHeight: 1.7,
-        width: element.width * 2,
-        height: element.height * 2,
-      } as OrderedExcalidrawElement;
+      if (part === "condition") {
+        return {
+          ...element,
+          fontFamily: FONT_FAMILY.Nunito,
+          fontSize: 28,
+          lineHeight: 1.6,
+          width: element.width * 1.6,
+          height: element.height * 1.6,
+        } as OrderedExcalidrawElement;
+      }
+
+      if (part === "else") {
+        return {
+          ...element,
+          fontFamily: FONT_FAMILY.Cascadia,
+          fontSize: 26,
+          lineHeight: 1.5,
+          width: element.width * 1.6,
+          height: element.height * 1.6,
+        } as OrderedExcalidrawElement;
+      }
+
+      return element;
     });
+
+    const scaledDuringResize = resizedFragment.map((element) => {
+      const part = element.customData?.sequenceDiagram?.part;
+      if (
+        (part === "label" || part === "condition" || part === "else") &&
+        element.type === "text"
+      ) {
+        return {
+          ...element,
+          fontSize: element.fontSize * 1.8,
+          lineHeight: element.lineHeight * 1.15,
+          width: element.width * 1.8,
+          height: element.height * 1.8,
+        } as OrderedExcalidrawElement;
+      }
+
+      if (part === "outline") {
+        return {
+          ...element,
+          width: element.width + 160,
+        } as OrderedExcalidrawElement;
+      }
+
+      return element;
+    });
+
+    const outline = resizedFragment.find(
+      (element) => element.customData?.sequenceDiagram?.part === "outline",
+    )!;
 
     const synced = synchronizeSequenceDiagramElements([
       ...leftLane,
       ...rightLane,
-      ...(fragment as OrderedExcalidrawElement[]),
-    ]);
+      ...scaledDuringResize,
+    ],
+    { [outline.id]: true },
+    {
+      resizeHandleType: "e",
+      originalElements: new Map(
+        [...leftLane, ...rightLane, ...resizedFragment].map((element) => [
+          element.id,
+          element as ExcalidrawElement,
+        ]),
+      ),
+    });
+
     const label = synced.elements.find(
       (element) => element.customData?.sequenceDiagram?.part === "label",
     ) as ExcalidrawTextElement | undefined;
     const conditionLabel = synced.elements.find(
       (element) => element.customData?.sequenceDiagram?.part === "condition",
     ) as ExcalidrawTextElement | undefined;
+    const elseLabel = synced.elements.find(
+      (element) => element.customData?.sequenceDiagram?.part === "else",
+    ) as ExcalidrawTextElement | undefined;
 
-    expect(label?.fontSize).toBe(SEQUENCE_TEXT_FONT_SIZE);
-    expect(label?.lineHeight).toBe(SEQUENCE_TEXT_LINE_HEIGHT);
-    expect(label?.width).toBeLessThan(120);
-    expect(conditionLabel?.fontSize).toBe(SEQUENCE_TEXT_FONT_SIZE);
-    expect(conditionLabel?.lineHeight).toBe(SEQUENCE_TEXT_LINE_HEIGHT);
+    expect(label?.fontSize).toBe(44);
+    expect(label?.lineHeight).toBe(1.7);
+    expect(label?.fontFamily).toBe(FONT_FAMILY.Helvetica);
+    expect(conditionLabel?.fontFamily).toBe(FONT_FAMILY.Nunito);
+    expect(conditionLabel?.fontSize).toBe(28);
+    expect(conditionLabel?.lineHeight).toBe(1.6);
+    expect(elseLabel?.fontFamily).toBe(FONT_FAMILY.Cascadia);
+    expect(elseLabel?.fontSize).toBe(26);
+    expect(elseLabel?.lineHeight).toBe(1.5);
   });
 
   it("updates fragment lane metadata when dragged to another span without snapping frame geometry", () => {

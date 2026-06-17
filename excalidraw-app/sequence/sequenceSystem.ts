@@ -637,6 +637,30 @@ const createFragmentSectionLabel = ({
   }) as OrderedExcalidrawElement;
 };
 
+const getTextMetrics = (
+  element: ExcalidrawTextElement | null | undefined,
+  text: string,
+) => {
+  return element ? measureTextElement(element, { text }) : measureSequenceText(text);
+};
+
+const getFragmentTextStyleSource = (
+  element: (OrderedExcalidrawElement & ExcalidrawTextElement) | null | undefined,
+  selected: boolean,
+  options?: SequenceSyncOptions,
+) => {
+  if (!element) {
+    return null;
+  }
+
+  if (!selected || !options?.resizeHandleType) {
+    return element;
+  }
+
+  const original = options.originalElements?.get(element.id);
+  return original?.type === "text" ? (original as ExcalidrawTextElement) : element;
+};
+
 const synchronizeFragments = (
   lanes: Map<string, SequenceLane>,
   fragments: Map<string, SequenceFragment>,
@@ -695,7 +719,14 @@ const synchronizeFragments = (
       | null;
     const headerLabel = fragment.label || boundHeaderLabel;
     const labelText = headerLabel?.originalText || headerLabel?.text;
-    const headerTextMetrics = labelText ? measureSequenceText(labelText) : null;
+    const headerLabelStyleSource = getFragmentTextStyleSource(
+      headerLabel,
+      selected,
+      options,
+    );
+    const headerTextMetrics = labelText
+      ? getTextMetrics(headerLabelStyleSource, labelText)
+      : null;
     const headerWidth = getSequenceFragmentHeaderWidth(
       headerVariant,
       headerTextMetrics?.width,
@@ -773,9 +804,10 @@ const synchronizeFragments = (
         y: nextLabelY,
         width: headerTextMetrics.width,
         height: headerTextMetrics.height,
-        fontFamily: SEQUENCE_TEXT_FONT_FAMILY,
-        fontSize: SEQUENCE_TEXT_FONT_SIZE,
-        lineHeight: SEQUENCE_TEXT_LINE_HEIGHT,
+        fontFamily: headerLabelStyleSource?.fontFamily,
+        fontSize: headerLabelStyleSource?.fontSize,
+        lineHeight: headerLabelStyleSource?.lineHeight,
+        strokeColor: headerLabelStyleSource?.strokeColor,
         autoResize: true,
         containerId: null,
         groupIds: fragment.header.groupIds,
@@ -797,9 +829,6 @@ const synchronizeFragments = (
         headerLabel.originalText !== labelText ||
         Math.abs(headerLabel.width - headerTextMetrics.width) > 0.5 ||
         Math.abs(headerLabel.height - headerTextMetrics.height) > 0.5 ||
-        headerLabel.fontFamily !== SEQUENCE_TEXT_FONT_FAMILY ||
-        Math.abs(headerLabel.fontSize - SEQUENCE_TEXT_FONT_SIZE) > 0.5 ||
-        Math.abs(headerLabel.lineHeight - SEQUENCE_TEXT_LINE_HEIGHT) > 0.001 ||
         Math.abs(headerLabel.x - nextLabelX) > 0.5 ||
         Math.abs(headerLabel.y - nextLabelY) > 0.5 ||
         getSequenceElementMeta(headerLabel)?.part !== "label" ||
@@ -816,7 +845,15 @@ const synchronizeFragments = (
       conditionLabel?.originalText ||
       conditionLabel?.text ||
       SEQUENCE_FRAGMENT_CONDITION_TEXT;
-    const conditionTextMetrics = measureSequenceText(conditionText);
+    const conditionLabelStyleSource = getFragmentTextStyleSource(
+      conditionLabel,
+      selected,
+      options,
+    );
+    const conditionTextMetrics = getTextMetrics(
+      conditionLabelStyleSource,
+      conditionText,
+    );
     const nextConditionX = frameLeft + SEQUENCE_FRAGMENT_SECTION_PADDING_X;
     const nextConditionY =
       fragment.outline.y +
@@ -831,12 +868,12 @@ const synchronizeFragments = (
         y: nextConditionY,
         width: conditionTextMetrics.width,
         height: conditionTextMetrics.height,
-        fontFamily: SEQUENCE_TEXT_FONT_FAMILY,
-        fontSize: SEQUENCE_TEXT_FONT_SIZE,
-        lineHeight: SEQUENCE_TEXT_LINE_HEIGHT,
+        fontFamily: conditionLabelStyleSource?.fontFamily,
+        fontSize: conditionLabelStyleSource?.fontSize,
+        lineHeight: conditionLabelStyleSource?.lineHeight,
+        strokeColor: conditionLabelStyleSource?.strokeColor,
         autoResize: true,
         containerId: null,
-        strokeColor: sectionTextColor,
         groupIds: fragment.header.groupIds,
         customData: {
           ...conditionLabel.customData,
@@ -856,9 +893,6 @@ const synchronizeFragments = (
         conditionLabel.originalText !== conditionText ||
         Math.abs(conditionLabel.width - conditionTextMetrics.width) > 0.5 ||
         Math.abs(conditionLabel.height - conditionTextMetrics.height) > 0.5 ||
-        conditionLabel.fontFamily !== SEQUENCE_TEXT_FONT_FAMILY ||
-        Math.abs(conditionLabel.fontSize - SEQUENCE_TEXT_FONT_SIZE) > 0.5 ||
-        Math.abs(conditionLabel.lineHeight - SEQUENCE_TEXT_LINE_HEIGHT) > 0.001 ||
         Math.abs(conditionLabel.x - nextConditionX) > 0.5 ||
         Math.abs(conditionLabel.y - nextConditionY) > 0.5 ||
         getSequenceElementMeta(conditionLabel)?.part !== "condition" ||
@@ -932,7 +966,12 @@ const synchronizeFragments = (
       const elseLabel = fragment.elseLabel;
       const elseText =
         elseLabel?.originalText || elseLabel?.text || SEQUENCE_FRAGMENT_ELSE_TEXT;
-      const elseTextMetrics = measureSequenceText(elseText);
+      const elseLabelStyleSource = getFragmentTextStyleSource(
+        elseLabel,
+        selected,
+        options,
+      );
+      const elseTextMetrics = getTextMetrics(elseLabelStyleSource, elseText);
       const nextElseX = frameLeft + SEQUENCE_FRAGMENT_SECTION_PADDING_X;
       const nextElseY = dividerY + SEQUENCE_FRAGMENT_SECTION_PADDING_Y;
 
@@ -944,12 +983,12 @@ const synchronizeFragments = (
           y: nextElseY,
           width: elseTextMetrics.width,
           height: elseTextMetrics.height,
-          fontFamily: SEQUENCE_TEXT_FONT_FAMILY,
-          fontSize: SEQUENCE_TEXT_FONT_SIZE,
-          lineHeight: SEQUENCE_TEXT_LINE_HEIGHT,
+          fontFamily: elseLabelStyleSource?.fontFamily,
+          fontSize: elseLabelStyleSource?.fontSize,
+          lineHeight: elseLabelStyleSource?.lineHeight,
+          strokeColor: elseLabelStyleSource?.strokeColor,
           autoResize: true,
           containerId: null,
-          strokeColor: sectionTextColor,
           groupIds: fragment.header.groupIds,
           customData: {
             ...elseLabel.customData,
@@ -969,9 +1008,6 @@ const synchronizeFragments = (
           elseLabel.originalText !== elseText ||
           Math.abs(elseLabel.width - elseTextMetrics.width) > 0.5 ||
           Math.abs(elseLabel.height - elseTextMetrics.height) > 0.5 ||
-          elseLabel.fontFamily !== SEQUENCE_TEXT_FONT_FAMILY ||
-          Math.abs(elseLabel.fontSize - SEQUENCE_TEXT_FONT_SIZE) > 0.5 ||
-          Math.abs(elseLabel.lineHeight - SEQUENCE_TEXT_LINE_HEIGHT) > 0.001 ||
           Math.abs(elseLabel.x - nextElseX) > 0.5 ||
           Math.abs(elseLabel.y - nextElseY) > 0.5 ||
           getSequenceElementMeta(elseLabel)?.part !== "else" ||

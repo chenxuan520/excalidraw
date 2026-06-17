@@ -466,6 +466,168 @@ describe("sequence groups", () => {
     expect(divider.x).toBeCloseTo(180);
     expect(divider.points[1][0]).toBeCloseTo(260);
   });
+
+  it("resizes fragment height downward without changing width or text size", async () => {
+    const groupId = "sequence-fragment-vertical-test";
+    const outline = API.createElement({
+      type: "rectangle",
+      x: 120,
+      y: 140,
+      width: 320,
+      height: 180,
+      groupIds: [groupId],
+    });
+    Object.assign(outline as any, {
+      groupIds: [groupId],
+      customData: {
+        sequenceDiagram: {
+          role: "fragment",
+          variant: "alt",
+          part: "outline",
+        },
+      },
+    });
+    const header = API.createElement({
+      type: "rectangle",
+      x: 120,
+      y: 140,
+      width: 62,
+      height: 28,
+      groupIds: [groupId],
+    });
+    Object.assign(header as any, {
+      groupIds: [groupId],
+      customData: {
+        sequenceDiagram: {
+          role: "fragment",
+          variant: "alt",
+          part: "header",
+        },
+      },
+    });
+    const label = API.createElement({
+      type: "text",
+      x: 135,
+      y: 144,
+      text: "alt",
+      fontFamily: 2,
+      fontSize: 44,
+      groupIds: [groupId],
+    });
+    Object.assign(label as any, {
+      groupIds: [groupId],
+      lineHeight: 1.7,
+      customData: {
+        sequenceDiagram: {
+          role: "fragment",
+          variant: "alt",
+          part: "label",
+        },
+      },
+    });
+    const condition = API.createElement({
+      type: "text",
+      x: 128,
+      y: 178,
+      text: "[Condition]",
+      fontFamily: 6,
+      fontSize: 28,
+      groupIds: [groupId],
+    });
+    Object.assign(condition as any, {
+      groupIds: [groupId],
+      lineHeight: 1.6,
+      customData: {
+        sequenceDiagram: {
+          role: "fragment",
+          variant: "alt",
+          part: "condition",
+        },
+      },
+    });
+    const divider = API.createElement({
+      type: "line",
+      x: 120,
+      y: 212,
+      width: 320,
+      height: 0,
+      points: [
+        [0, 0],
+        [320, 0],
+      ],
+      groupIds: [groupId],
+    });
+    Object.assign(divider as any, {
+      groupIds: [groupId],
+      customData: {
+        sequenceDiagram: {
+          role: "fragment",
+          variant: "alt",
+          part: "divider",
+          offsetY: 72,
+        },
+      },
+    });
+    const elseLabel = API.createElement({
+      type: "text",
+      x: 128,
+      y: 222,
+      text: "[Else]",
+      fontFamily: 3,
+      fontSize: 26,
+      groupIds: [groupId],
+    });
+    Object.assign(elseLabel as any, {
+      groupIds: [groupId],
+      lineHeight: 1.5,
+      customData: {
+        sequenceDiagram: {
+          role: "fragment",
+          variant: "alt",
+          part: "else",
+        },
+      },
+    });
+
+    h.elements = [outline, header, label, condition, divider, elseLabel];
+
+    const originalElements = new Map<string, any>([
+      [outline.id, { ...outline }],
+      [header.id, { ...header }],
+      [label.id, { ...label }],
+      [condition.id, { ...condition }],
+      [elseLabel.id, { ...elseLabel }],
+      [
+        divider.id,
+        {
+          ...divider,
+          points: [...divider.points],
+        },
+      ],
+    ]);
+
+    transformElements(
+      originalElements,
+      "s",
+      [outline, header, label, condition, divider, elseLabel],
+      arrayToMap(h.elements),
+      false,
+      false,
+      false,
+      outline.x,
+      outline.y + outline.height + 120,
+      0,
+      0,
+    );
+
+    expect(outline.width).toBe(320);
+    expect(outline.height).toBeGreaterThan(180);
+    expect(header.width).toBe(62);
+    expect(label.fontSize).toBe(44);
+    expect(condition.fontSize).toBe(28);
+    expect(elseLabel.fontSize).toBe(26);
+    expect(divider.y).toBe(212);
+  });
 });
 
 describe("arrow element", () => {

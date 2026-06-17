@@ -674,6 +674,34 @@
       }
     }
   },
+  "defaultLibraryItems": {
+    "star": {
+      "name": "Star"
+    },
+    "triangle": {
+      "name": "Triangle"
+    },
+    "leftArrow": {
+      "name": "Left arrow"
+    },
+    "rightArrow": {
+      "name": "Right arrow"
+    },
+    "bidirectionalArrow": {
+      "name": "Bidirectional arrow"
+    },
+    "cloud": {
+      "name": "Cloud"
+    },
+    "database": {
+      "name": "Database",
+      "label": "Database"
+    },
+    "messageQueue": {
+      "name": "Message Queue",
+      "label": "Queue"
+    }
+  },
   "quickSearch": {
     "placeholder": "Quick search"
   },

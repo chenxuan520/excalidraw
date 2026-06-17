@@ -725,5 +725,33 @@
         "description": "虚线分支框"
       }
     }
+  },
+  "defaultLibraryItems": {
+    "star": {
+      "name": "星形"
+    },
+    "triangle": {
+      "name": "三角形"
+    },
+    "leftArrow": {
+      "name": "左箭头"
+    },
+    "rightArrow": {
+      "name": "右箭头"
+    },
+    "bidirectionalArrow": {
+      "name": "双向箭头"
+    },
+    "cloud": {
+      "name": "云朵"
+    },
+    "database": {
+      "name": "数据库",
+      "label": "数据库"
+    },
+    "messageQueue": {
+      "name": "消息队列",
+      "label": "消息队列"
+    }
   }
 }

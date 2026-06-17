@@ -13,6 +13,7 @@ import {
 } from "../packages/excalidraw/constants";
 import { loadFromBlob } from "../packages/excalidraw/data/blob";
 import { serializeAsJSON } from "../packages/excalidraw/data/json";
+import type { ClipboardData } from "../packages/excalidraw/clipboard";
 import type {
   FileId,
   NonDeletedExcalidrawElement,
@@ -113,6 +114,7 @@ import { useAppLangCode } from "./app-language/language-state";
 import {
   SequenceDiagramSidebar,
   SequenceDiagramMenuIcon,
+  getSequencePasteAnchor,
 } from "./sequence/SequenceDiagramSidebar";
 import { SequenceActivationHandles } from "./sequence/SequenceActivationHandles";
 import { SequenceFragmentHandles } from "./sequence/SequenceFragmentHandles";
@@ -1682,6 +1684,36 @@ const ExcalidrawWrapper = () => {
     });
   };
 
+  const handleSequencePaste = useCallback(
+    (data: ClipboardData, event: ClipboardEvent | null) => {
+      // Let plain-text paste keep its default behavior even when clipboard
+      // payload also contains serialized Excalidraw elements.
+      if (
+        !excalidrawAPI ||
+        !data?.elements ||
+        data.programmaticAPI ||
+        data.text
+      ) {
+        return true;
+      }
+
+      const anchor = getSequencePasteAnchor(data.elements);
+      if (!anchor) {
+        return true;
+      }
+
+      event?.preventDefault();
+      excalidrawAPI.addElementsFromPasteOrLibrary({
+        elements: data.elements,
+        files: data.files || null,
+        position: "cursor",
+        anchor,
+      });
+      return false;
+    },
+    [excalidrawAPI],
+  );
+
   return (
     <div
       style={{ height: "100%" }}
@@ -1693,6 +1725,7 @@ const ExcalidrawWrapper = () => {
         excalidrawAPI={excalidrawRefCallback}
         aiEnabled={false}
         onChange={onChange}
+        onPaste={handleSequencePaste}
         onPointerDown={(_activeTool, pointerDownState) => {
           sequenceResizeHandleTypeRef.current =
             pointerDownState.resize.handleType;

@@ -122,6 +122,35 @@ const resetElementToOriginalGeometry = (
   mutateElement(latest, update as any, false);
 };
 
+const resetFragmentTextToOriginalGeometry = (
+  latest: NonDeletedExcalidrawElement,
+  orig: NonDeletedExcalidrawElement,
+  deltaY = 0,
+) => {
+  if (!isTextElement(orig)) {
+    resetElementToOriginalGeometry(latest, orig);
+    return;
+  }
+
+  mutateElement(
+    latest as any,
+    {
+      x: orig.x,
+      y: orig.y + deltaY,
+      width: orig.width,
+      height: orig.height,
+      angle: orig.angle,
+      fontFamily: orig.fontFamily,
+      fontSize: orig.fontSize,
+      lineHeight: orig.lineHeight,
+      strokeColor: orig.strokeColor,
+      text: orig.text,
+      originalText: orig.originalText,
+    },
+    false,
+  );
+};
+
 const maybeResizeSingleSequenceLaneVertically = (
   originalElements: PointerDownState["originalElements"],
   element: NonDeletedExcalidrawElement,
@@ -347,6 +376,37 @@ const maybeResizeSingleSequenceFragmentHorizontally = (
   return true;
 };
 
+const maybeResizeSingleSequenceFragmentVertically = (
+  originalElements: PointerDownState["originalElements"],
+  element: NonDeletedExcalidrawElement,
+  elementsMap: ElementsMap,
+  transformHandleType: TransformHandleDirection,
+  shouldResizeFromCenter: boolean,
+  pointerY: number,
+) => {
+  if (transformHandleType !== "s" || shouldResizeFromCenter) {
+    return false;
+  }
+
+  const groupId = element.groupIds[0];
+  if (!groupId) {
+    return false;
+  }
+
+  const targetElements = getSequenceGroupElements(
+    originalElements,
+    elementsMap,
+    groupId,
+  );
+
+  return maybeResizeSequenceFragmentGroupVertically(
+    targetElements,
+    transformHandleType,
+    shouldResizeFromCenter,
+    pointerY,
+  );
+};
+
 const maybeResizeSequenceLaneGroupVertically = (
   targetElements: {
     orig: NonDeletedExcalidrawElement;
@@ -538,6 +598,135 @@ const maybeResizeSequenceFragmentGroupHorizontally = (
   return true;
 };
 
+const maybeResizeSequenceFragmentGroupVertically = (
+  targetElements: {
+    orig: NonDeletedExcalidrawElement;
+    latest: NonDeletedExcalidrawElement;
+  }[],
+  transformHandleType: TransformHandleDirection,
+  shouldResizeFromCenter: boolean,
+  pointerY: number,
+) => {
+  if (transformHandleType !== "s" || shouldResizeFromCenter) {
+    return false;
+  }
+
+  const outlineItems = targetElements.filter(
+    ({ orig }) =>
+      getSequenceDiagramMeta(orig)?.role === "fragment" &&
+      getSequenceDiagramMeta(orig)?.part === "outline",
+  );
+  const headerItems = targetElements.filter(
+    ({ orig }) =>
+      getSequenceDiagramMeta(orig)?.role === "fragment" &&
+      getSequenceDiagramMeta(orig)?.part === "header",
+  );
+
+  if (outlineItems.length !== 1 || headerItems.length !== 1) {
+    return false;
+  }
+
+  const outlineItem = outlineItems[0];
+  const headerItem = headerItems[0];
+  const labelItem = targetElements.find(
+    ({ orig }) =>
+      getSequenceDiagramMeta(orig)?.role === "fragment" &&
+      getSequenceDiagramMeta(orig)?.part === "label",
+  );
+  const conditionItem = targetElements.find(
+    ({ orig }) =>
+      getSequenceDiagramMeta(orig)?.role === "fragment" &&
+      getSequenceDiagramMeta(orig)?.part === "condition",
+  );
+  const elseItem = targetElements.find(
+    ({ orig }) =>
+      getSequenceDiagramMeta(orig)?.role === "fragment" &&
+      getSequenceDiagramMeta(orig)?.part === "else",
+  );
+  const dividerItem = targetElements.find(
+    ({ orig }) =>
+      getSequenceDiagramMeta(orig)?.role === "fragment" &&
+      getSequenceDiagramMeta(orig)?.part === "divider",
+  );
+
+  const outlineOrig = outlineItem.orig;
+  const headerOrig = headerItem.orig;
+  const minHeight = Math.max(
+    headerOrig.height + 24,
+    dividerItem && isLinearElement(dividerItem.orig)
+      ? dividerItem.orig.y - outlineOrig.y + 24
+      : 0,
+  );
+  const nextHeight = Math.max(minHeight, pointerY - outlineOrig.y);
+
+  for (const { orig, latest } of targetElements) {
+    if (
+      latest.id !== outlineItem.latest.id &&
+      latest.id !== headerItem.latest.id &&
+      latest.id !== labelItem?.latest.id &&
+      latest.id !== conditionItem?.latest.id &&
+      latest.id !== elseItem?.latest.id &&
+      latest.id !== dividerItem?.latest.id
+    ) {
+      resetElementToOriginalGeometry(latest, orig);
+    }
+  }
+
+  mutateElement(
+    outlineItem.latest,
+    {
+      x: outlineOrig.x,
+      y: outlineOrig.y,
+      width: outlineOrig.width,
+      height: nextHeight,
+      angle: outlineOrig.angle,
+    },
+    false,
+  );
+
+  mutateElement(
+    headerItem.latest,
+    {
+      x: headerOrig.x,
+      y: headerOrig.y,
+      width: headerOrig.width,
+      height: headerOrig.height,
+      angle: headerOrig.angle,
+    },
+    false,
+  );
+
+  if (labelItem) {
+    resetFragmentTextToOriginalGeometry(labelItem.latest, labelItem.orig);
+  }
+
+  if (conditionItem) {
+    resetFragmentTextToOriginalGeometry(conditionItem.latest, conditionItem.orig);
+  }
+
+  if (elseItem) {
+    resetFragmentTextToOriginalGeometry(elseItem.latest, elseItem.orig);
+  }
+
+  if (dividerItem && isLinearElement(dividerItem.orig)) {
+    mutateElement(
+      dividerItem.latest as any,
+      {
+        x: dividerItem.orig.x,
+        y: dividerItem.orig.y,
+        width: dividerItem.orig.width,
+        height: dividerItem.orig.height,
+        angle: dividerItem.orig.angle,
+        points: dividerItem.orig.points,
+      },
+      false,
+    );
+  }
+
+  Scene.getScene(outlineItem.latest)?.triggerUpdate();
+  return true;
+};
+
 // Returns true when transform (resizing/rotation) happened
 export const transformElements = (
   originalElements: PointerDownState["originalElements"],
@@ -577,6 +766,14 @@ export const transformElements = (
     } else if (transformHandleType) {
       if (
         maybeResizeSingleSequenceLaneVertically(
+          originalElements,
+          element,
+          elementsMap,
+          transformHandleType,
+          shouldResizeFromCenter,
+          pointerY,
+        ) ||
+        maybeResizeSingleSequenceFragmentVertically(
           originalElements,
           element,
           elementsMap,
@@ -1251,6 +1448,12 @@ export const resizeMultipleElements = (
 
   if (
     maybeResizeSequenceLaneGroupVertically(
+      targetElements,
+      transformHandleType,
+      shouldResizeFromCenter,
+      pointerY,
+    ) ||
+    maybeResizeSequenceFragmentGroupVertically(
       targetElements,
       transformHandleType,
       shouldResizeFromCenter,

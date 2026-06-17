@@ -73,6 +73,42 @@ export const getSequenceDragAnchor = (
   };
 };
 
+export const getSequencePasteAnchor = (
+  elements: readonly ExcalidrawElement[],
+) => {
+  const laneGroupIds = new Set(
+    elements
+      .filter(
+        (element) =>
+          isSequenceParticipantElement(element) ||
+          isSequenceLifelineElement(element),
+      )
+      .map((element) => element.groupIds[0])
+      .filter((groupId): groupId is string => Boolean(groupId)),
+  );
+
+  if (!laneGroupIds.size) {
+    return undefined;
+  }
+
+  const anchorElements = elements.filter(
+    (element) =>
+      element.groupIds[0] &&
+      laneGroupIds.has(element.groupIds[0]) &&
+      !isSequenceLifelineElement(element),
+  );
+
+  if (!anchorElements.length) {
+    return undefined;
+  }
+
+  const [minX, minY, maxX] = getCommonBounds(anchorElements);
+  return {
+    x: (minX + maxX) / 2,
+    y: minY,
+  };
+};
+
 const LANE_INSERT_GAP = 88;
 const STACK_INSERT_GAP = 56;
 const MESSAGE_TARGET_KINDS = new Set<SequenceStencilKind>([
