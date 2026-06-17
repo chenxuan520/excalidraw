@@ -90,4 +90,22 @@ describe("getSequenceDragAnchor", () => {
       y: 0,
     });
   });
+
+  it("does not customize paste anchor for mixed sequence and non-sequence selections", () => {
+    const lane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    );
+    const rectangle = convertToExcalidrawElements([
+      {
+        type: "rectangle",
+        x: 260,
+        y: 80,
+        width: 120,
+        height: 60,
+      },
+    ]);
+
+    expect(getSequencePasteAnchor([...lane, ...rectangle])).toBeUndefined();
+  });
 });

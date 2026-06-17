@@ -76,18 +76,38 @@ export const getSequenceDragAnchor = (
 export const getSequencePasteAnchor = (
   elements: readonly ExcalidrawElement[],
 ) => {
+  const sequenceElements = elements.filter(
+    (element) =>
+      Boolean(getSequenceElementMeta(element)) ||
+      isSequenceParticipantElement(element) ||
+      isSequenceLifelineElement(element),
+  );
+
   const laneGroupIds = new Set(
-    elements
-      .filter(
-        (element) =>
-          isSequenceParticipantElement(element) ||
-          isSequenceLifelineElement(element),
-      )
+    sequenceElements
       .map((element) => element.groupIds[0])
       .filter((groupId): groupId is string => Boolean(groupId)),
   );
 
   if (!laneGroupIds.size) {
+    return undefined;
+  }
+
+  const sequenceElementIds = new Set(sequenceElements.map((element) => element.id));
+  const isSequenceClipboardElement = (element: ExcalidrawElement) => {
+    if (getSequenceElementMeta(element)) {
+      return true;
+    }
+    if (element.groupIds[0] && laneGroupIds.has(element.groupIds[0])) {
+      return true;
+    }
+    if ("containerId" in element && element.containerId) {
+      return sequenceElementIds.has(element.containerId);
+    }
+    return false;
+  };
+
+  if (!elements.every(isSequenceClipboardElement)) {
     return undefined;
   }
 
