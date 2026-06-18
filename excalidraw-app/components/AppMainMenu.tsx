@@ -10,6 +10,7 @@ import { useI18n } from "../../packages/excalidraw/i18n";
 import { MainMenu } from "../../packages/excalidraw/index";
 import { AlignmentAidsSettingsIcon } from "./AlignmentAidsSettings";
 import { LanguageList } from "../app-language/LanguageList";
+import { MindMapMenuIcon } from "../mindmap/MindMapSidebar";
 import { SequenceDiagramMenuIcon } from "../sequence/SequenceDiagramSidebar";
 
 export const AppMainMenu: React.FC<{
@@ -20,6 +21,7 @@ export const AppMainMenu: React.FC<{
   onOpenAlignmentAidsSettings: () => void;
   onOpenLogin: () => void;
   onOpenManager: () => void;
+  onOpenMindMap: () => void;
   onOpenSequenceDiagram: () => void;
   onSave: () => void;
   onLogout: () => void;
@@ -51,6 +53,9 @@ export const AppMainMenu: React.FC<{
           </MainMenu.Item>
         </>
       )}
+      <MainMenu.Item icon={MindMapMenuIcon} onSelect={props.onOpenMindMap}>
+        {t("mindMap.menu")}
+      </MainMenu.Item>
       <MainMenu.Item
         icon={SequenceDiagramMenuIcon}
         onSelect={props.onOpenSequenceDiagram}

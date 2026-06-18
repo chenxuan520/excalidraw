@@ -36,6 +36,11 @@ import {
   sequenceStencilSections,
 } from "./sequenceStencils";
 import { applySequenceInsertionContext } from "./sequenceInsertion";
+import { MIND_MAP_SIDEBAR_TAB } from "../mindmap/mindMapStencils";
+import {
+  MindMapSidebarTab,
+  MindMapSidebarTabTrigger,
+} from "../mindmap/MindMapSidebar";
 
 import "./SequenceDiagramSidebar.scss";
 
@@ -66,7 +71,7 @@ export const getSequenceDragAnchor = (
     return undefined;
   }
 
-  const [minX, minY, maxX] = getCommonBounds(anchorElements);
+  const [minX, , maxX] = getCommonBounds(anchorElements);
   return {
     x: (minX + maxX) / 2 - minX,
     y: 0,
@@ -410,9 +415,10 @@ export const SequenceDiagramSidebar = ({
   const appState = useExcalidrawAppState();
   const { t } = useI18n();
 
-  const isSequenceSidebarOpen =
+  const isDiagramSidebarOpen =
     appState.openSidebar?.name === "default" &&
-    appState.openSidebar?.tab === SEQUENCE_DIAGRAM_SIDEBAR_TAB;
+    (appState.openSidebar?.tab === SEQUENCE_DIAGRAM_SIDEBAR_TAB ||
+      appState.openSidebar?.tab === MIND_MAP_SIDEBAR_TAB);
 
   const defaults = getSequenceStencilDefaults(t);
 
@@ -637,8 +643,9 @@ export const SequenceDiagramSidebar = ({
   };
 
   return (
-    <>
-      <DefaultSidebar docked={isSequenceSidebarOpen ? true : undefined}>
+      <>
+      <DefaultSidebar docked={isDiagramSidebarOpen ? true : undefined}>
+        <MindMapSidebarTab />
         <Sidebar.Tab tab={SEQUENCE_DIAGRAM_SIDEBAR_TAB}>
           <div className="sequence-diagram-sidebar">
             <div className="sequence-diagram-sidebar__intro">
@@ -676,12 +683,11 @@ export const SequenceDiagramSidebar = ({
                         <button
                           key={value}
                           type="button"
-                          className={
-                            "sequence-diagram-sidebar__direction-option" +
-                            (requestDirection === value
+                          className={`sequence-diagram-sidebar__direction-option${
+                            requestDirection === value
                               ? " sequence-diagram-sidebar__direction-option--active"
-                              : "")
-                          }
+                              : ""
+                          }`}
                           onClick={() => onRequestDirectionChange(value)}
                         >
                           {label}
@@ -719,6 +725,7 @@ export const SequenceDiagramSidebar = ({
         >
           {LibraryIcon}
         </Sidebar.TabTrigger>
+        <MindMapSidebarTabTrigger />
         <Sidebar.TabTrigger
           tab={SEQUENCE_DIAGRAM_SIDEBAR_TAB}
           title={t("sequenceDiagram.tab")}

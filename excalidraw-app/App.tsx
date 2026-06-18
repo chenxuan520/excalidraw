@@ -126,6 +126,16 @@ import {
   SequenceDiagramMenuIcon,
   getSequencePasteAnchor,
 } from "./sequence/SequenceDiagramSidebar";
+import {
+  MindMapMenuIcon,
+} from "./mindmap/MindMapSidebar";
+import {
+  MIND_MAP_SIDEBAR_TAB,
+} from "./mindmap/mindMapStencils";
+import { getMindMapPasteAnchor } from "./mindmap/MindMapSidebar";
+import { MindMapKeyboardShortcuts } from "./mindmap/MindMapKeyboardShortcuts";
+import { MindMapNodeHandles } from "./mindmap/MindMapNodeHandles";
+import { synchronizeMindMapElements } from "./mindmap/mindMapSystem";
 import { SequenceActivationHandles } from "./sequence/SequenceActivationHandles";
 import { SequenceFragmentHandles } from "./sequence/SequenceFragmentHandles";
 import { SequenceParticipantAlignmentGuides } from "./sequence/SequenceParticipantAlignmentGuides";
@@ -421,6 +431,7 @@ const ExcalidrawWrapper = () => {
     importWebDAVConfigFromLocalStorage(),
   );
   const isApplyingSequenceSyncRef = useRef(false);
+  const isApplyingMindMapSyncRef = useRef(false);
   const isApplyingElementAlignmentRef = useRef(false);
   const isDefaultLibrarySeedPendingRef = useRef(false);
   const sequenceResizeHandleTypeRef = useRef<string | boolean | null>(null);
@@ -1489,7 +1500,7 @@ const ExcalidrawWrapper = () => {
     };
   }, [excalidrawAPI]);
 
-  const applySequenceSync = useCallback(
+  const applyDiagramSyncs = useCallback(
     (
       nextElements: readonly OrderedExcalidrawElement[],
       selectedElementIds: AppState["selectedElementIds"],
@@ -1501,7 +1512,7 @@ const ExcalidrawWrapper = () => {
         return false;
       }
 
-      const synced = synchronizeSequenceDiagramElements(
+      const sequenceSynced = synchronizeSequenceDiagramElements(
         nextElements,
         selectedElementIds,
         {
@@ -1510,15 +1521,33 @@ const ExcalidrawWrapper = () => {
           alignmentSnapTopYByLaneKey,
         },
       );
-      if (!synced.changed) {
+      const sequenceElements = sequenceSynced.changed
+        ? sequenceSynced.elements
+        : nextElements;
+      const mindMapSynced = synchronizeMindMapElements(
+        sequenceElements,
+        selectedElementIds,
+      );
+
+      if (!sequenceSynced.changed && !mindMapSynced.changed) {
         return false;
       }
 
-      isApplyingSequenceSyncRef.current = true;
+      isApplyingSequenceSyncRef.current = sequenceSynced.changed;
+      isApplyingMindMapSyncRef.current = mindMapSynced.changed;
       excalidrawAPI.updateScene(
         storeAction
-          ? { elements: synced.elements, storeAction }
-          : { elements: synced.elements },
+          ? {
+              elements: mindMapSynced.changed
+                ? mindMapSynced.elements
+                : sequenceElements,
+              storeAction,
+            }
+          : {
+              elements: mindMapSynced.changed
+                ? mindMapSynced.elements
+                : sequenceElements,
+            },
       );
       return true;
     },
@@ -1537,7 +1566,7 @@ const ExcalidrawWrapper = () => {
         return;
       }
 
-      applySequenceSync(
+      applyDiagramSyncs(
         excalidrawAPI.getSceneElementsIncludingDeleted() as readonly OrderedExcalidrawElement[],
         excalidrawAPI.getAppState().selectedElementIds,
         StoreAction.UPDATE,
@@ -1547,7 +1576,7 @@ const ExcalidrawWrapper = () => {
     return () => {
       cancelled = true;
     };
-  }, [applySequenceSync, excalidrawAPI]);
+  }, [applyDiagramSyncs, excalidrawAPI]);
 
   const onChange = (
     elements: readonly OrderedExcalidrawElement[],
@@ -1555,12 +1584,23 @@ const ExcalidrawWrapper = () => {
     files: BinaryFiles,
   ) => {
     if (excalidrawAPI) {
+      const isInternalSceneUpdate =
+        isApplyingSequenceSyncRef.current ||
+        isApplyingMindMapSyncRef.current ||
+        isApplyingElementAlignmentRef.current;
+
       if (isApplyingSequenceSyncRef.current) {
         isApplyingSequenceSyncRef.current = false;
-      } else if (isApplyingElementAlignmentRef.current) {
+      }
+      if (isApplyingMindMapSyncRef.current) {
+        isApplyingMindMapSyncRef.current = false;
+      }
+      if (isApplyingElementAlignmentRef.current) {
         isApplyingElementAlignmentRef.current = false;
-      } else if (
-        applySequenceSync(
+      }
+
+      if (!isInternalSceneUpdate &&
+        applyDiagramSyncs(
           elements,
           appState.selectedElementIds,
           StoreAction.UPDATE,
@@ -1577,10 +1617,9 @@ const ExcalidrawWrapper = () => {
                 zoomValue: appState.zoom.value,
               })
             : undefined,
-        )
-      ) {
+        )) {
         return;
-      } else if (
+      } else if (!isInternalSceneUpdate &&
         alignmentAidsEnabled &&
         appState.selectedElementsAreBeingDragged &&
         !appState.objectsSnapModeEnabled &&
@@ -1703,28 +1742,26 @@ const ExcalidrawWrapper = () => {
       >
     >[1],
   ) => {
-    if (!excalidrawAPI || isApplyingSequenceSyncRef.current) {
+    if (
+      !excalidrawAPI ||
+      isApplyingSequenceSyncRef.current ||
+      isApplyingMindMapSyncRef.current
+    ) {
       return;
     }
 
-    const elements =
-      excalidrawAPI.getSceneElementsIncludingDeleted() as readonly OrderedExcalidrawElement[];
-    const selectedElementIds = excalidrawAPI.getAppState().selectedElementIds;
-    const synced = synchronizeSequenceDiagramElements(
-      elements,
-      selectedElementIds,
-      { resizeHandleType: pointerDownState.resize.handleType },
-    );
-    if (!synced.changed) {
-      sequenceResizeHandleTypeRef.current = null;
-      sequenceResizeOriginalElementsRef.current = null;
-      return;
-    }
-
-    isApplyingSequenceSyncRef.current = true;
+    applyDiagramSyncs(
+      excalidrawAPI.getSceneElementsIncludingDeleted() as readonly OrderedExcalidrawElement[],
+      excalidrawAPI.getAppState().selectedElementIds,
+      undefined,
+      pointerDownState.resize.handleType,
+    ) ||
+      (() => {
+        sequenceResizeHandleTypeRef.current = null;
+        sequenceResizeOriginalElementsRef.current = null;
+      })();
     sequenceResizeHandleTypeRef.current = null;
     sequenceResizeOriginalElementsRef.current = null;
-    excalidrawAPI.updateScene({ elements: synced.elements });
   };
 
   const renderCustomStats = (
@@ -1775,35 +1812,43 @@ const ExcalidrawWrapper = () => {
     });
   };
 
-  const handleSequencePaste = useCallback(
-    (data: ClipboardData, event: ClipboardEvent | null) => {
-      // Let plain-text paste keep its default behavior even when clipboard
-      // payload also contains serialized Excalidraw elements.
-      if (
-        !excalidrawAPI ||
-        !data?.elements ||
-        data.programmaticAPI ||
-        data.text
-      ) {
-        return true;
-      }
+  const openMindMapSidebar = () => {
+    excalidrawAPI?.updateScene({
+      appState: {
+        openSidebar: {
+          name: "default",
+          tab: MIND_MAP_SIDEBAR_TAB,
+        },
+      },
+      storeAction: StoreAction.NONE,
+    });
+  };
 
-      const anchor = getSequencePasteAnchor(data.elements);
-      if (!anchor) {
-        return true;
-      }
+  const handleSequencePaste = (
+    data: ClipboardData,
+    event: ClipboardEvent | null,
+  ) => {
+    // Let plain-text paste keep its default behavior even when clipboard
+    // payload also contains serialized Excalidraw elements.
+    if (!excalidrawAPI || !data?.elements || data.programmaticAPI || data.text) {
+      return true;
+    }
 
-      event?.preventDefault();
-      excalidrawAPI.addElementsFromPasteOrLibrary({
-        elements: data.elements,
-        files: data.files || null,
-        position: "cursor",
-        anchor,
-      });
-      return false;
-    },
-    [excalidrawAPI],
-  );
+    const anchor =
+      getMindMapPasteAnchor(data.elements) || getSequencePasteAnchor(data.elements);
+    if (!anchor) {
+      return true;
+    }
+
+    event?.preventDefault();
+    excalidrawAPI.addElementsFromPasteOrLibrary({
+      elements: data.elements,
+      files: data.files || null,
+      position: "cursor",
+      anchor,
+    });
+    return false;
+  };
 
   return (
     <div
@@ -1863,6 +1908,7 @@ const ExcalidrawWrapper = () => {
           onOpenLogin={() => setWebDAVLoginOpen(true)}
           onOpenManager={() => setWebDAVFileManagerOpen(true)}
           onOpenAlignmentAidsSettings={openAlignmentAidsSettings}
+          onOpenMindMap={openMindMapSidebar}
           onOpenSequenceDiagram={openSequenceDiagramSidebar}
           onSave={() => saveCurrentSceneToWebDAV()}
           onLogout={handleWebDAVLogout}
@@ -1888,6 +1934,8 @@ const ExcalidrawWrapper = () => {
           requestDirection={sequenceRequestDirection}
           onRequestDirectionChange={setSequenceRequestDirection}
         />
+        <MindMapKeyboardShortcuts />
+        <MindMapNodeHandles />
         <SequenceActivationHandles
           requestDirection={sequenceRequestDirection}
         />
@@ -2039,6 +2087,21 @@ const ExcalidrawWrapper = () => {
                 "设置",
               ],
               perform: openAlignmentAidsSettings,
+            },
+            {
+              label: t("mindMap.menu"),
+              category: DEFAULT_CATEGORIES.tools,
+              icon: MindMapMenuIcon,
+              predicate: true,
+              keywords: [
+                "mind map",
+                "mindmap",
+                "tree",
+                "timeline",
+                "思维导图",
+                "树状图",
+              ],
+              perform: openMindMapSidebar,
             },
             {
               label: t("sequenceDiagram.menu"),

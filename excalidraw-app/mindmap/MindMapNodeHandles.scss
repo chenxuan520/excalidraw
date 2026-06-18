@@ -1,0 +1,38 @@
+.excalidraw {
+  .mind-map-node-handles {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: var(--zIndex-layerUI);
+  }
+
+  .mind-map-node-handles__button {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.6rem;
+    height: 1.6rem;
+    border: 0;
+    border-radius: 999px;
+    background: var(--color-primary);
+    color: #fff;
+    box-shadow: 0 8px 20px rgba(59, 92, 204, 0.24);
+    transform: translate(-50%, -50%);
+    cursor: pointer;
+    pointer-events: auto;
+
+    &:hover {
+      filter: brightness(1.04);
+    }
+
+    svg {
+      width: 0.9rem;
+      height: 0.9rem;
+    }
+  }
+
+  .mind-map-node-handles__button--sibling {
+    background: color-mix(in srgb, var(--color-primary) 88%, white 12%);
+  }
+}

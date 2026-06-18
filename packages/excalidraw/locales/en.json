@@ -676,6 +676,56 @@
       }
     }
   },
+  "mindMap": {
+    "tab": "Mind map",
+    "title": "Mind map templates",
+    "description": "Insert Feishu-like mind map, tree, and timeline layouts as editable Excalidraw elements.",
+    "footer": "Tip: after insertion, each node and connector stays editable. You can move, restyle, regroup, or rewrite any text.",
+    "menu": "Mind map templates",
+    "addChild": "Add child node",
+    "addSibling": "Add sibling node",
+    "sections": {
+      "maps": "Mind maps",
+      "trees": "Trees",
+      "timelines": "Timelines"
+    },
+    "defaults": {
+      "mainTopic": "Input text",
+      "topic": "Input text",
+      "subtopic": "Input text",
+      "event": "Input text"
+    },
+    "items": {
+      "mindmap-right": {
+        "label": "Right mind map",
+        "description": "Center topic branching to the right"
+      },
+      "mindmap-left": {
+        "label": "Left mind map",
+        "description": "Center topic branching to the left"
+      },
+      "tree-right": {
+        "label": "Right tree",
+        "description": "Top-down tree with children on the right"
+      },
+      "tree-left": {
+        "label": "Left tree",
+        "description": "Top-down tree with children on the left"
+      },
+      "tree-balanced": {
+        "label": "Balanced tree",
+        "description": "Top-down tree split to both sides"
+      },
+      "timeline-horizontal": {
+        "label": "Horizontal timeline",
+        "description": "Left-to-right timeline with branches"
+      },
+      "timeline-vertical": {
+        "label": "Vertical timeline",
+        "description": "Top-down timeline with side events"
+      }
+    }
+  },
   "alignmentAidsDialog": {
     "general": "General settings",
     "drawing": "Drawing settings",

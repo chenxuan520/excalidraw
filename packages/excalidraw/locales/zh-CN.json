@@ -728,6 +728,56 @@
       }
     }
   },
+  "mindMap": {
+    "tab": "思维导图",
+    "title": "思维导图模板",
+    "description": "把类似飞书画板的思维导图、树状图和时间线模板直接插到画布里，插入后仍然是普通 Excalidraw 元素。",
+    "footer": "提示：插入后每个节点和连接线都还能继续编辑、改字、改样式、重新组合。",
+    "menu": "思维导图模板",
+    "addChild": "添加子节点",
+    "addSibling": "添加同级节点",
+    "sections": {
+      "maps": "思维导图",
+      "trees": "树状图",
+      "timelines": "时间线"
+    },
+    "defaults": {
+      "mainTopic": "输入文本",
+      "topic": "输入文本",
+      "subtopic": "输入文本",
+      "event": "输入文本"
+    },
+    "items": {
+      "mindmap-right": {
+        "label": "右向导图",
+        "description": "中心主题向右发散"
+      },
+      "mindmap-left": {
+        "label": "左向导图",
+        "description": "中心主题向左发散"
+      },
+      "tree-right": {
+        "label": "右向树状图",
+        "description": "自上而下，子节点排在右侧"
+      },
+      "tree-left": {
+        "label": "左向树状图",
+        "description": "自上而下，子节点排在左侧"
+      },
+      "tree-balanced": {
+        "label": "双侧树状图",
+        "description": "自上而下，两侧同时展开"
+      },
+      "timeline-horizontal": {
+        "label": "横向时间线",
+        "description": "横向主线加分支事件"
+      },
+      "timeline-vertical": {
+        "label": "纵向时间线",
+        "description": "纵向主线加侧边事件"
+      }
+    }
+  },
   "alignmentAidsDialog": {
     "general": "通用设置",
     "drawing": "绘画设置",
