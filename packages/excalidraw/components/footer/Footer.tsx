@@ -25,7 +25,8 @@ const Footer = ({
   showExitZenModeBtn: boolean;
   renderWelcomeScreen: boolean;
 }) => {
-  const { FooterCenterTunnel, WelcomeScreenHelpHintTunnel } = useTunnels();
+  const { FooterCenterTunnel, FooterRightTunnel, WelcomeScreenHelpHintTunnel } =
+    useTunnels();
 
   const device = useDevice();
   const showFinalize =
@@ -76,8 +77,16 @@ const Footer = ({
           "transition-right": appState.zenModeEnabled,
         })}
       >
-        <div style={{ position: "relative" }}>
+        <div
+          style={{
+            position: "relative",
+            display: "flex",
+            gap: "0.5rem",
+            alignItems: "center",
+          }}
+        >
           {renderWelcomeScreen && <WelcomeScreenHelpHintTunnel.Out />}
+          <FooterRightTunnel.Out />
           <HelpButton
             onClick={() => actionManager.executeAction(actionShortcuts)}
           />

@@ -52,7 +52,8 @@ export type ShortcutName =
     >
   | "saveScene"
   | "imageExport"
-  | "commandPalette";
+  | "commandPalette"
+  | "openSettings";
 
 export const registerCustomShortcuts = (
   shortcuts: Record<CustomActionName, string[]>,
@@ -121,6 +122,7 @@ const shortcutMap: Record<ShortcutName, string[]> = {
   setFrameAsActiveTool: [getShortcutKey("F")],
   saveFileToDisk: [getShortcutKey("CtrlOrCmd+S")],
   saveToActiveFile: [getShortcutKey("CtrlOrCmd+S")],
+  openSettings: [getShortcutKey("CtrlOrCmd+,")],
   toggleShortcuts: [getShortcutKey("?")],
 };
 

@@ -52,8 +52,7 @@ describe("getSequenceParticipantAlignmentGuides", () => {
     });
 
     expect(guides).toHaveLength(1);
-    expect(guides[0].leftX).toBeLessThan(guides[0].referenceLeftX);
-    expect(guides[0].y).toBe(0);
+    expect(guides[0]).toMatchObject({ edge: "top", position: 0 });
   });
 
   it("supports selecting a decorative actor member to resolve the lane", () => {
@@ -80,7 +79,32 @@ describe("getSequenceParticipantAlignmentGuides", () => {
     });
 
     expect(guides).toHaveLength(1);
-    expect(guides[0].y).toBe(3);
+    expect(guides[0]).toMatchObject({ edge: "top", position: 3 });
+  });
+
+  it("returns left and right guides for nearby participant sides", () => {
+    const topLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+    const bottomLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ).map((element) => ({
+      ...element,
+      x: element.x + 4,
+      y: element.y + 240,
+    })) as OrderedExcalidrawElement[];
+
+    const guides = getSequenceParticipantAlignmentGuides({
+      elements: [...topLane, ...bottomLane],
+      selectedElementIds: Object.fromEntries(
+        bottomLane.map((element) => [element.id, true]),
+      ) as Record<string, true>,
+      zoomValue: 1,
+    });
+
+    expect(guides.map((guide) => guide.edge).sort()).toEqual(["left", "right"]);
   });
 
   it("returns snap targets only when a lane is close enough to align", () => {
@@ -122,5 +146,38 @@ describe("getSequenceParticipantAlignmentGuides", () => {
 
     expect([...nearTargets.values()]).toEqual([0]);
     expect(farTargets.size).toBe(0);
+  });
+
+  it("does not return alignment guides for lanes that are too far apart", () => {
+    const leftLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+    const farLane = convertToExcalidrawElements(
+      createSequenceStencil("participant", "light", defaults),
+      { regenerateIds: false },
+    ).map((element) => ({
+      ...element,
+      x: element.x + 900,
+      y: element.y + 4,
+    })) as OrderedExcalidrawElement[];
+
+    const guides = getSequenceParticipantAlignmentGuides({
+      elements: [...leftLane, ...farLane],
+      selectedElementIds: Object.fromEntries(
+        farLane.map((element) => [element.id, true]),
+      ) as Record<string, true>,
+      zoomValue: 1,
+    });
+    const snapTargets = getSequenceParticipantAlignmentSnapTargets({
+      elements: [...leftLane, ...farLane],
+      selectedElementIds: Object.fromEntries(
+        farLane.map((element) => [element.id, true]),
+      ) as Record<string, true>,
+      zoomValue: 1,
+    });
+
+    expect(guides).toHaveLength(0);
+    expect(snapTargets.size).toBe(0);
   });
 });

@@ -106,6 +106,7 @@
     "showStroke": "显示描边颜色选择器",
     "showBackground": "显示背景颜色选择器",
     "toggleTheme": "切换主题",
+    "alignmentAids": "辅助线与吸附",
     "personalLib": "个人素材库",
     "excalidrawLib": "Excalidraw 素材库",
     "decreaseFontSize": "缩小字体大小",
@@ -155,6 +156,7 @@
     "saveAs": "保存为",
     "load": "打开",
     "getShareableLink": "获取共享链接",
+    "settings": "设置",
     "close": "关闭",
     "selectLanguage": "选择语言",
     "scrollBackToContent": "滚动回到内容",
@@ -725,6 +727,12 @@
         "description": "虚线分支框"
       }
     }
+  },
+  "alignmentAidsDialog": {
+    "general": "通用设置",
+    "drawing": "绘画设置",
+    "languageDescription": "选择编辑器语言。",
+    "alignmentDescription": "控制普通矩形与时序参与者的轻量辅助线和自动吸附行为。"
   },
   "defaultLibraryItems": {
     "star": {

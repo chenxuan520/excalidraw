@@ -4,10 +4,11 @@ import {
   ExportIcon,
   LibraryIcon,
 } from "../../packages/excalidraw/components/icons";
+import { getShortcutFromShortcutName } from "../../packages/excalidraw/actions/shortcuts";
 import type { Theme } from "../../packages/excalidraw/element/types";
 import { useI18n } from "../../packages/excalidraw/i18n";
 import { MainMenu } from "../../packages/excalidraw/index";
-import { LanguageList } from "../app-language/LanguageList";
+import { AlignmentAidsSettingsIcon } from "./AlignmentAidsSettings";
 import { SequenceDiagramMenuIcon } from "../sequence/SequenceDiagramSidebar";
 
 export const AppMainMenu: React.FC<{
@@ -15,6 +16,7 @@ export const AppMainMenu: React.FC<{
   remoteDirty: boolean;
   theme: Theme | "system";
   setTheme: (theme: Theme | "system") => void;
+  onOpenAlignmentAidsSettings: () => void;
   onOpenLogin: () => void;
   onOpenManager: () => void;
   onOpenSequenceDiagram: () => void;
@@ -54,6 +56,13 @@ export const AppMainMenu: React.FC<{
       >
         {t("sequenceDiagram.menu")}
       </MainMenu.Item>
+      <MainMenu.Item
+        icon={AlignmentAidsSettingsIcon}
+        onSelect={props.onOpenAlignmentAidsSettings}
+        shortcut={getShortcutFromShortcutName("openSettings")}
+      >
+        {t("buttons.settings")}
+      </MainMenu.Item>
       <MainMenu.DefaultItems.Help />
       <MainMenu.DefaultItems.ClearCanvas />
       <MainMenu.DefaultItems.CommandPalette className="highlighted" />
@@ -65,9 +74,6 @@ export const AppMainMenu: React.FC<{
         theme={props.theme}
         onSelect={props.setTheme}
       />
-      <MainMenu.ItemCustom>
-        <LanguageList style={{ width: "100%" }} />
-      </MainMenu.ItemCustom>
       <MainMenu.DefaultItems.ChangeCanvasBackground />
     </MainMenu>
   );

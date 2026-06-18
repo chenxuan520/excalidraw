@@ -1,12 +1,12 @@
 .excalidraw {
-  .sequence-participant-alignment-guides {
+  .alignment-guides {
     position: absolute;
     inset: 0;
     z-index: var(--zIndex-layerUI);
     pointer-events: none;
   }
 
-  .sequence-participant-alignment-guides__svg {
+  .alignment-guides__svg {
     position: absolute;
     inset: 0;
     width: 100%;
@@ -15,8 +15,8 @@
     pointer-events: none;
   }
 
-  .sequence-participant-alignment-guides__cap,
-  .sequence-participant-alignment-guides__connector {
+  .alignment-guides__cap,
+  .alignment-guides__connector {
     fill: none;
     stroke: color-mix(in srgb, var(--color-primary) 86%, white 8%);
     stroke-width: 2;
@@ -24,7 +24,7 @@
     filter: drop-shadow(0 1px 1px rgb(15 23 42 / 0.16));
   }
 
-  .sequence-participant-alignment-guides__connector {
+  .alignment-guides__connector {
     stroke-dasharray: 4 4;
     opacity: 0.9;
   }

@@ -101,6 +101,7 @@ The repo uses custom scripts rather than a monorepo task runner.
 - Vitest is configured at the repo root in `vitest.config.mts` with a jsdom environment and coverage thresholds.
 - The app build output lives in `excalidraw-app/build`.
 - The root `package.json` declares Node `18.0.0 - 25.x.x`; `.nvmrc` is `18`.
+- If delegating review/research to a subagent for this repository, the prompt must explicitly say it is read-only and must not modify files, stage changes, or commit; if the task is not supposed to edit code, never omit that constraint.
 - After every `git push` in this repository, monitor the corresponding GitHub Actions runs with `gh` until the relevant `Tests` / `build_and_release` workflows finish successfully before considering the task done.
 - After every release tag push, additionally verify the GitHub Release asset `excalidraw-app.tar.gz` exists before stopping.
 - If a workflow fails, inspect the failed logs first with `gh run view <run-id> --log-failed`; if the failure is in a test file, rerun that exact file locally (repeat if needed to assess flakiness) before deciding whether to change product code or stabilize the test itself.

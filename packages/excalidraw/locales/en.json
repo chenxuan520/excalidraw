@@ -112,6 +112,7 @@
     "showBackground": "Show background color picker",
     "showFonts": "Show font picker",
     "toggleTheme": "Toggle light/dark theme",
+    "alignmentAids": "Alignment guides and snap",
     "theme": "Theme",
     "personalLib": "Personal Library",
     "excalidrawLib": "Excalidraw Library",
@@ -169,6 +170,7 @@
     "saveAs": "Save as",
     "load": "Open",
     "getShareableLink": "Get shareable link",
+    "settings": "Settings",
     "close": "Close",
     "selectLanguage": "Select language",
     "scrollBackToContent": "Scroll back to content",
@@ -673,6 +675,12 @@
         "description": "Dashed alternative frame"
       }
     }
+  },
+  "alignmentAidsDialog": {
+    "general": "General settings",
+    "drawing": "Drawing settings",
+    "languageDescription": "Choose the editor language.",
+    "alignmentDescription": "Control the lightweight alignment guides and snap behavior for rectangles and sequence participants."
   },
   "defaultLibraryItems": {
     "star": {

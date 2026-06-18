@@ -23,6 +23,7 @@ import { useCallbackRefState } from "../packages/excalidraw/hooks/useCallbackRef
 import { t } from "../packages/excalidraw/i18n";
 import {
   Excalidraw,
+  FooterRight,
   TTDDialog,
   TTDDialogTrigger,
   StoreAction,
@@ -40,6 +41,7 @@ import {
   debounce,
   getVersion,
   getFrame,
+  isInputLike,
   isTestEnv,
   preventUnload,
   resolvablePromise,
@@ -95,6 +97,7 @@ import type { ResolutionType } from "../packages/excalidraw/utility-types";
 import { openConfirmModal } from "../packages/excalidraw/components/OverwriteConfirm/OverwriteConfirmState";
 import { OverwriteConfirmDialog } from "../packages/excalidraw/components/OverwriteConfirm/OverwriteConfirm";
 import type { RemoteExcalidrawElement } from "../packages/excalidraw/data/reconcile";
+import { KEYS } from "../packages/excalidraw/keys";
 import {
   CommandPalette,
   DEFAULT_CATEGORIES,
@@ -111,6 +114,13 @@ import {
 import { appThemeAtom, useHandleAppTheme } from "./useHandleAppTheme";
 import { getPreferredLanguage } from "./app-language/language-detector";
 import { useAppLangCode } from "./app-language/language-state";
+import { ElementAlignmentGuides } from "./ElementAlignmentGuides";
+import { getGeneralElementAlignmentSnapOffset } from "./elementAlignment";
+import {
+  AlignmentAidsSettings,
+  AlignmentAidsSettingsTrigger,
+  AlignmentAidsSettingsIcon,
+} from "./components/AlignmentAidsSettings";
 import {
   SequenceDiagramSidebar,
   SequenceDiagramMenuIcon,
@@ -381,6 +391,11 @@ const ExcalidrawWrapper = () => {
         ? "rtl"
         : DEFAULT_SEQUENCE_REQUEST_DIRECTION;
     });
+  const [alignmentAidsEnabled, setAlignmentAidsEnabled] = useState(() => {
+    return window.localStorage.getItem("alignment-aids-enabled") !== "false";
+  });
+  const [isAlignmentAidsSettingsOpen, setAlignmentAidsSettingsOpen] =
+    useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const isCollabDisabled = isRunningInIframe();
 
@@ -406,6 +421,7 @@ const ExcalidrawWrapper = () => {
     importWebDAVConfigFromLocalStorage(),
   );
   const isApplyingSequenceSyncRef = useRef(false);
+  const isApplyingElementAlignmentRef = useRef(false);
   const isDefaultLibrarySeedPendingRef = useRef(false);
   const sequenceResizeHandleTypeRef = useRef<string | boolean | null>(null);
   const sequenceResizeOriginalElementsRef = useRef<Map<string, any> | null>(
@@ -443,6 +459,13 @@ const ExcalidrawWrapper = () => {
     );
   }, [sequenceRequestDirection]);
 
+  useEffect(() => {
+    window.localStorage.setItem(
+      "alignment-aids-enabled",
+      alignmentAidsEnabled ? "true" : "false",
+    );
+  }, [alignmentAidsEnabled]);
+
   const [collabAPI] = useAtom(collabAPIAtom);
 
   const getInitialLocalDataState = useCallback((): ImportedDataState | null => {
@@ -462,6 +485,10 @@ const ExcalidrawWrapper = () => {
   const [isCollaborating] = useAtomWithInitialValue(isCollaboratingAtom, () => {
     return isCollaborationLink(window.location.href);
   });
+
+  const openAlignmentAidsSettings = useCallback(() => {
+    setAlignmentAidsSettingsOpen(true);
+  }, []);
 
   useHandleLibrary({
     excalidrawAPI,
@@ -490,6 +517,38 @@ const ExcalidrawWrapper = () => {
         isDefaultLibrarySeedPendingRef.current = false;
       });
   }, [excalidrawAPI, langCode]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.altKey ||
+        event.shiftKey ||
+        !event[KEYS.CTRL_OR_CMD] ||
+        (event.key !== KEYS.COMMA && event.code !== "Comma") ||
+        isInputLike(event.target)
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+
+      if (
+        isAlignmentAidsSettingsOpen ||
+        excalidrawAPI?.getAppState().openDialog ||
+        document.querySelector(".excalidraw-modal-container .Modal")
+      ) {
+        return;
+      }
+
+      openAlignmentAidsSettings();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [excalidrawAPI, isAlignmentAidsSettingsOpen, openAlignmentAidsSettings]);
 
   const refreshWebDAVFiles = useCallback(
     async (config = webdavSession.config) => {
@@ -1498,13 +1557,17 @@ const ExcalidrawWrapper = () => {
     if (excalidrawAPI) {
       if (isApplyingSequenceSyncRef.current) {
         isApplyingSequenceSyncRef.current = false;
+      } else if (isApplyingElementAlignmentRef.current) {
+        isApplyingElementAlignmentRef.current = false;
       } else if (
         applySequenceSync(
           elements,
           appState.selectedElementIds,
           StoreAction.UPDATE,
           appState.isResizing ? sequenceResizeHandleTypeRef.current : null,
-          appState.selectedElementsAreBeingDragged &&
+          alignmentAidsEnabled &&
+            appState.selectedElementsAreBeingDragged &&
+            !appState.objectsSnapModeEnabled &&
             !appState.isResizing &&
             !appState.viewModeEnabled &&
             appState.activeTool.type === "selection"
@@ -1517,6 +1580,34 @@ const ExcalidrawWrapper = () => {
         )
       ) {
         return;
+      } else if (
+        alignmentAidsEnabled &&
+        appState.selectedElementsAreBeingDragged &&
+        !appState.objectsSnapModeEnabled &&
+        !appState.isResizing &&
+        !appState.viewModeEnabled &&
+        appState.activeTool.type === "selection"
+      ) {
+        const snapOffset = getGeneralElementAlignmentSnapOffset({
+          elements,
+          selectedElementIds: appState.selectedElementIds,
+          zoomValue: appState.zoom.value,
+        });
+
+        if (snapOffset) {
+          const nextElements = elements.map((element) =>
+            snapOffset.movableElementIds.has(element.id)
+              ? (newElementWith(element, {
+                  x: element.x + snapOffset.offsetX,
+                  y: element.y + snapOffset.offsetY,
+                }) as OrderedExcalidrawElement)
+              : element,
+          );
+
+          isApplyingElementAlignmentRef.current = true;
+          excalidrawAPI.updateScene({ elements: nextElements });
+          return;
+        }
       }
     }
 
@@ -1771,6 +1862,7 @@ const ExcalidrawWrapper = () => {
           remoteDirty={webdavSession.remoteDirty}
           onOpenLogin={() => setWebDAVLoginOpen(true)}
           onOpenManager={() => setWebDAVFileManagerOpen(true)}
+          onOpenAlignmentAidsSettings={openAlignmentAidsSettings}
           onOpenSequenceDiagram={openSequenceDiagramSidebar}
           onSave={() => saveCurrentSceneToWebDAV()}
           onLogout={handleWebDAVLogout}
@@ -1783,6 +1875,15 @@ const ExcalidrawWrapper = () => {
           <OverwriteConfirmDialog.Actions.SaveToDisk />
         </OverwriteConfirmDialog>
         <AppFooter />
+        <FooterRight>
+          <AlignmentAidsSettingsTrigger onOpen={openAlignmentAidsSettings} />
+        </FooterRight>
+        <AlignmentAidsSettings
+          isOpen={isAlignmentAidsSettingsOpen}
+          onClose={() => setAlignmentAidsSettingsOpen(false)}
+          enabled={alignmentAidsEnabled}
+          onEnabledChange={setAlignmentAidsEnabled}
+        />
         <SequenceDiagramSidebar
           requestDirection={sequenceRequestDirection}
           onRequestDirectionChange={setSequenceRequestDirection}
@@ -1791,7 +1892,8 @@ const ExcalidrawWrapper = () => {
           requestDirection={sequenceRequestDirection}
         />
         <SequenceFragmentHandles />
-        <SequenceParticipantAlignmentGuides />
+        {alignmentAidsEnabled && <ElementAlignmentGuides />}
+        {alignmentAidsEnabled && <SequenceParticipantAlignmentGuides />}
         <TTDDialog
           onTextSubmit={async (input) => {
             try {
@@ -1923,6 +2025,20 @@ const ExcalidrawWrapper = () => {
               icon: loginIcon,
               keywords: ["webdav", "logout", "disconnect"],
               perform: handleWebDAVLogout,
+            },
+            {
+              label: t("buttons.settings"),
+              category: DEFAULT_CATEGORIES.app,
+              icon: AlignmentAidsSettingsIcon,
+              predicate: true,
+              keywords: [
+                "settings",
+                "preferences",
+                "alignment",
+                "language",
+                "设置",
+              ],
+              perform: openAlignmentAidsSettings,
             },
             {
               label: t("sequenceDiagram.menu"),
