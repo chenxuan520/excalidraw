@@ -9,6 +9,7 @@ import type { Theme } from "../../packages/excalidraw/element/types";
 import { useI18n } from "../../packages/excalidraw/i18n";
 import { MainMenu } from "../../packages/excalidraw/index";
 import { AlignmentAidsSettingsIcon } from "./AlignmentAidsSettings";
+import { LanguageList } from "../app-language/LanguageList";
 import { SequenceDiagramMenuIcon } from "../sequence/SequenceDiagramSidebar";
 
 export const AppMainMenu: React.FC<{
@@ -74,6 +75,9 @@ export const AppMainMenu: React.FC<{
         theme={props.theme}
         onSelect={props.setTheme}
       />
+      <MainMenu.ItemCustom>
+        <LanguageList style={{ width: "100%" }} />
+      </MainMenu.ItemCustom>
       <MainMenu.DefaultItems.ChangeCanvasBackground />
     </MainMenu>
   );
