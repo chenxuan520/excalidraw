@@ -41,9 +41,10 @@ export type MindMapElementData = {
   sourceId?: string;
   targetId?: string;
   side?: MindMapSide;
-   lane?: MindMapLane;
+  lane?: MindMapLane;
   order?: number;
   level?: number;
+  cascadeDeletedBy?: string;
 };
 
 type MindMapElementMeta = {
@@ -771,11 +772,15 @@ const createHorizontalTimelineTemplate = (
     order: 1,
     level: 1,
   });
+  const textGap = 30;
+  const horizontalBranchGapX = 96;
+  const horizontalBranchGapY = 72;
+  const eventMetrics = measureMindMapText(defaults.event);
   const top = createPlacedNode({
     template,
     label: defaults.event,
-    x: 298,
-    y: 28,
+    x: centerA.x + centerA.width + horizontalBranchGapX,
+    y: getNodeCenterY(centerA) - horizontalBranchGapY - eventMetrics.height,
     palette,
     parentId: centerA.id,
     side: "right",
@@ -786,8 +791,8 @@ const createHorizontalTimelineTemplate = (
   const bottom = createPlacedNode({
     template,
     label: defaults.subtopic,
-    x: 468,
-    y: 164,
+    x: centerB.x + centerB.width + horizontalBranchGapX,
+    y: getNodeCenterY(centerB) + horizontalBranchGapY,
     palette,
     parentId: centerB.id,
     side: "right",
@@ -798,7 +803,8 @@ const createHorizontalTimelineTemplate = (
 
   const rootRightX = root.x + root.width;
   const rootCenterY = getNodeCenterY(root);
-  const textGap = 30;
+  const centerACenterX = centerA.x + centerA.width / 2;
+  const centerBCenterX = centerB.x + centerB.width / 2;
 
   return [
     root.element,
@@ -832,8 +838,8 @@ const createHorizontalTimelineTemplate = (
       sourceId: centerA.id,
       targetId: top.id,
       points: [
-        [centerA.x + centerA.width + textGap, getNodeCenterY(centerA)],
-        [centerA.x + centerA.width + textGap, getNodeCenterY(top)],
+        [centerACenterX, centerA.y - textGap],
+        [centerACenterX, getNodeCenterY(top)],
         [top.x - textGap, getNodeCenterY(top)],
       ],
     }),
@@ -843,8 +849,8 @@ const createHorizontalTimelineTemplate = (
       sourceId: centerB.id,
       targetId: bottom.id,
       points: [
-        [centerB.x + centerB.width + textGap, getNodeCenterY(centerB)],
-        [centerB.x + centerB.width + textGap, getNodeCenterY(bottom)],
+        [centerBCenterX, centerB.y + centerB.height + textGap],
+        [centerBCenterX, getNodeCenterY(bottom)],
         [bottom.x - textGap, getNodeCenterY(bottom)],
       ],
     }),

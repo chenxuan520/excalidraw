@@ -366,6 +366,34 @@ describe("mind map system", () => {
     expect(insertedNode.x).toBeGreaterThan(selectedNode.x);
   });
 
+  it("does not insert from horizontal timeline branch nodes", () => {
+    const elements = convertToExcalidrawElements(
+      createMindMapStencil("timeline-horizontal", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+    const topNode = elements.find(
+      (element) =>
+        isMindMapNodeElement(element) &&
+        getMindMapElementMeta(element)?.lane === "top",
+    )!;
+
+    const childResult = insertMindMapNode({
+      elements,
+      selectedElementIds: { [topNode.id]: true },
+      mode: "child",
+      defaults,
+    });
+    const siblingResult = insertMindMapNode({
+      elements,
+      selectedElementIds: { [topNode.id]: true },
+      mode: "sibling",
+      defaults,
+    });
+
+    expect(childResult).toBeNull();
+    expect(siblingResult).toBeNull();
+  });
+
   it("keeps a selected horizontal timeline center node on the center lane", () => {
     const elements = convertToExcalidrawElements(
       createMindMapStencil("timeline-horizontal", "light", defaults),
@@ -634,5 +662,132 @@ describe("mind map system", () => {
 
     expect(deletedChild.isDeleted).toBe(true);
     expect(descendantConnector.isDeleted).toBe(true);
+  });
+
+  it("restores cascade-deleted descendants when undo restores the deleted parent", () => {
+    const elements = convertToExcalidrawElements(
+      createMindMapStencil("mindmap-right", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+    const topNode = elements.filter(isMindMapNodeElement)[0] as OrderedExcalidrawElement;
+    const childNode = elements.find(
+      (element) =>
+        isMindMapNodeElement(element) &&
+        getMindMapElementMeta(element)?.parentId === topNode.id,
+    ) as OrderedExcalidrawElement;
+
+    const deleted = synchronizeMindMapElements(
+      elements.map((element) =>
+        element.id === topNode.id
+          ? (newElementWith(element, {
+              isDeleted: true,
+            }) as OrderedExcalidrawElement)
+          : element,
+      ),
+    ).elements;
+    const restored = synchronizeMindMapElements(
+      deleted.map((element) =>
+        element.id === topNode.id
+          ? (newElementWith(element, {
+              isDeleted: false,
+            }) as OrderedExcalidrawElement)
+          : element,
+      ),
+    ).elements;
+    const restoredChild = restored.find((element) => element.id === childNode.id)!;
+    const restoredConnector = restored.find(
+      (element) =>
+        isMindMapConnectorElement(element) &&
+        getMindMapElementMeta(element)?.targetId === childNode.id,
+    )!;
+    const restoredParentConnector = restored.find(
+      (element) =>
+        isMindMapConnectorElement(element) &&
+        getMindMapElementMeta(element)?.targetId === topNode.id,
+    )!;
+
+    expect(restoredChild.isDeleted).toBe(false);
+    expect(restoredConnector.isDeleted).toBe(false);
+    expect(restoredParentConnector.isDeleted).toBe(false);
+    expect(getMindMapElementMeta(restoredChild)?.cascadeDeletedBy).toBeUndefined();
+    expect(getMindMapElementMeta(restoredConnector)?.cascadeDeletedBy).toBeUndefined();
+    expect(
+      getMindMapElementMeta(restoredParentConnector)?.cascadeDeletedBy,
+    ).toBeUndefined();
+  });
+
+  it("deletes orphaned mind map nodes instead of reparenting them to another root", () => {
+    const first = convertToExcalidrawElements(
+      createMindMapStencil("timeline-horizontal", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+    const second = convertToExcalidrawElements(
+      createMindMapStencil("timeline-horizontal", "light", defaults),
+      { regenerateIds: false },
+    ).map((element) =>
+      newElementWith(element as OrderedExcalidrawElement, {
+        x: element.x + 900,
+      }),
+    ) as OrderedExcalidrawElement[];
+    const firstRoot = first.find((element) => isMindMapRootElement(element))!;
+    const firstChildIds = new Set(
+      first.filter(isMindMapNodeElement).map((element) => element.id),
+    );
+
+    const synced = synchronizeMindMapElements(
+      [...first, ...second].map((element) =>
+        element.id === firstRoot.id
+          ? (newElementWith(element, {
+              isDeleted: true,
+            }) as OrderedExcalidrawElement)
+          : element,
+      ),
+    );
+
+    for (const childId of firstChildIds) {
+      expect(synced.elements.find((element) => element.id === childId)?.isDeleted).toBe(
+        true,
+      );
+    }
+    for (const element of synced.elements) {
+      const meta = getMindMapElementMeta(element);
+      if (
+        isMindMapConnectorElement(element) &&
+        (firstChildIds.has(meta?.sourceId || "") ||
+          firstChildIds.has(meta?.targetId || ""))
+      ) {
+        expect(element.isDeleted).toBe(true);
+      }
+    }
+  });
+
+  it("deletes mind map descendants when the root element is removed from the scene", () => {
+    const elements = convertToExcalidrawElements(
+      createMindMapStencil("timeline-horizontal", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+    const root = elements.find((element) => isMindMapRootElement(element))!;
+    const childIds = new Set(
+      elements.filter(isMindMapNodeElement).map((element) => element.id),
+    );
+
+    const synced = synchronizeMindMapElements(
+      elements.filter((element) => element.id !== root.id),
+    );
+
+    for (const childId of childIds) {
+      expect(synced.elements.find((element) => element.id === childId)?.isDeleted).toBe(
+        true,
+      );
+    }
+    for (const element of synced.elements) {
+      const meta = getMindMapElementMeta(element);
+      if (
+        isMindMapConnectorElement(element) &&
+        (childIds.has(meta?.sourceId || "") || childIds.has(meta?.targetId || ""))
+      ) {
+        expect(element.isDeleted).toBe(true);
+      }
+    }
   });
 });

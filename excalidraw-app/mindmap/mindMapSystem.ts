@@ -71,10 +71,11 @@ type BuiltTrees = {
 export type MindMapInsertMode = "child" | "sibling";
 
 const TIMELINE_HORIZONTAL_GAP_X = 132;
-const TIMELINE_HORIZONTAL_GAP_Y = 34;
+const TIMELINE_HORIZONTAL_GAP_Y = 72;
 const TIMELINE_VERTICAL_GAP_Y = 86;
 const TIMELINE_VERTICAL_GAP_X = 118;
 const TIMELINE_TEXT_GAP = 30;
+const TIMELINE_HORIZONTAL_BRANCH_GAP_X = 96;
 
 type Box = {
   x: number;
@@ -303,20 +304,32 @@ const normalizeTimelineTree = (tree: MindMapTree) => {
   timelineNodes
     .filter((node) => !centerNodeIds.has(node.id))
     .forEach((node) => {
-      const parentCenter =
-        (node.parentId && centerNodeIds.has(node.parentId)
+      const existingParent =
+        node.parentId && tree.nodes.has(node.parentId)
           ? tree.nodes.get(node.parentId)
+          : null;
+      const parentCenter =
+        (existingParent && centerNodeIds.has(existingParent.id)
+          ? existingParent
           : null) ||
         [...centerNodes].sort(
           (left, right) =>
             Math.abs(axisValue(left) - axisValue(node)) -
             Math.abs(axisValue(right) - axisValue(node)),
         )[0]!;
+      const branchParent =
+        existingParent &&
+        existingParent.id !== tree.root.id &&
+        !centerNodeIds.has(existingParent.id)
+          ? existingParent
+          : parentCenter;
 
-      node.parentId = parentCenter.id;
+      node.parentId = branchParent.id;
       if (orientation === "horizontal") {
         node.lane =
-          node.lane === "top" || node.lane === "bottom"
+          branchParent.lane === "top" || branchParent.lane === "bottom"
+            ? branchParent.lane
+            : node.lane === "top" || node.lane === "bottom"
             ? node.lane
             : crossValue(node) < getBox(parentCenter.element).centerY
             ? "top"
@@ -331,10 +344,11 @@ const normalizeTimelineTree = (tree: MindMapTree) => {
             : "right";
         node.side = node.lane === "left" ? "left" : "right";
       }
-      node.level = 2;
-      const nextOrder = branchOrderByParent.get(parentCenter.id) || 0;
+      node.level =
+        branchParent.id === parentCenter.id ? 2 : branchParent.level + 1;
+      const nextOrder = branchOrderByParent.get(branchParent.id) || 0;
       node.order = nextOrder;
-      branchOrderByParent.set(parentCenter.id, nextOrder + 1);
+      branchOrderByParent.set(branchParent.id, nextOrder + 1);
     });
 
   for (const node of tree.nodes.values()) {
@@ -892,7 +906,15 @@ const createTimelineVerticalLeafPoints = (
 const createTimelineHorizontalBranchPoints = (
   parentBox: Box,
   childBox: Box,
+  isBranchContinuation = false,
 ) => {
+  if (isBranchContinuation) {
+    return [
+      [parentBox.right + TIMELINE_TEXT_GAP, parentBox.centerY],
+      [childBox.x - TIMELINE_TEXT_GAP, childBox.centerY],
+    ] as const;
+  }
+
   const branchX = parentBox.centerX;
   const parentEdgeY =
     childBox.centerY < parentBox.centerY
@@ -1213,12 +1235,15 @@ const layoutMindMapTree = (tree: MindMapTree) => {
 
       for (const child of branchChildren) {
         if (orientation === "horizontal") {
-          const nextX = parentBox.right + TIMELINE_TEXT_GAP * 2;
-          const nextY = getTimelineHorizontalNodeY(
-            parentBox,
-            child.element.height,
-            child.lane,
-          );
+          const nextX = parentBox.right + TIMELINE_HORIZONTAL_BRANCH_GAP_X;
+          const nextY =
+            parent.lane && parent.lane !== "center"
+              ? parentBox.centerY - child.element.height / 2
+              : getTimelineHorizontalNodeY(
+                  parentBox,
+                  child.element.height,
+                  child.lane,
+                );
           positions.set(child.id, { x: nextX, y: nextY });
         } else {
           const nextY = parentBox.centerY - child.element.height / 2;
@@ -1268,8 +1293,111 @@ export const synchronizeMindMapElements = (
   elements: readonly OrderedExcalidrawElement[],
   _selectedElementIds?: SelectedElementIds,
 ) => {
+  const restoredCascadeNodeIds = new Set<string>();
+  let restoredDiscovered = true;
+  while (restoredDiscovered) {
+    restoredDiscovered = false;
+    const activeOrRestoredNodeIds = new Set<string>(restoredCascadeNodeIds);
+    for (const element of elements) {
+      if (
+        !element.isDeleted &&
+        (isMindMapRootElement(element) || isMindMapNodeElement(element))
+      ) {
+        activeOrRestoredNodeIds.add(getMindMapElementMeta(element)?.nodeId || element.id);
+      }
+    }
+    for (const element of elements) {
+      if (!element.isDeleted || !isMindMapNodeElement(element)) {
+        continue;
+      }
+      const meta = getMindMapElementMeta(element);
+      const nodeId = meta?.nodeId || element.id;
+      if (
+        meta?.cascadeDeletedBy &&
+        meta.parentId &&
+        activeOrRestoredNodeIds.has(meta.parentId) &&
+        !restoredCascadeNodeIds.has(nodeId)
+      ) {
+        restoredCascadeNodeIds.add(nodeId);
+        restoredDiscovered = true;
+      }
+    }
+  }
+  const activeOrRestoredNodeIds = new Set<string>(restoredCascadeNodeIds);
+  for (const element of elements) {
+    if (
+      !element.isDeleted &&
+      (isMindMapRootElement(element) || isMindMapNodeElement(element))
+    ) {
+      activeOrRestoredNodeIds.add(getMindMapElementMeta(element)?.nodeId || element.id);
+    }
+  }
+  const restoreCascadeElement = (element: OrderedExcalidrawElement) => {
+    const meta = getMindMapElementMeta(element);
+    if (!meta?.cascadeDeletedBy) {
+      return element;
+    }
+    if (
+      isMindMapNodeElement(element) &&
+      restoredCascadeNodeIds.has(meta.nodeId || element.id)
+    ) {
+      return newElementWith(element, {
+        isDeleted: false,
+        customData: {
+          ...element.customData,
+          mindMap: {
+            ...meta,
+            cascadeDeletedBy: undefined,
+          },
+        },
+      }) as OrderedExcalidrawElement;
+    }
+    if (
+      isMindMapConnectorElement(element) &&
+      meta.sourceId &&
+      meta.targetId &&
+      activeOrRestoredNodeIds.has(meta.sourceId) &&
+      activeOrRestoredNodeIds.has(meta.targetId)
+    ) {
+      return newElementWith(element, {
+        isDeleted: false,
+        customData: {
+          ...element.customData,
+          mindMap: {
+            ...meta,
+            cascadeDeletedBy: undefined,
+          },
+        },
+      }) as OrderedExcalidrawElement;
+    }
+    return element;
+  };
+  const restoredElements = elements.map((element) =>
+    restoreCascadeElement(element),
+  ) as OrderedExcalidrawElement[];
+  const activeMindMapNodes = new Map<string, MindMapNodeElement>();
+  for (const element of restoredElements) {
+    if (
+      !element.isDeleted &&
+      (isMindMapRootElement(element) || isMindMapNodeElement(element))
+    ) {
+      activeMindMapNodes.set(element.id, element);
+    }
+  }
+  const connectorParentByTargetId = new Map<string, string>();
+  for (const element of restoredElements) {
+    if (!element.isDeleted && isMindMapConnectorElement(element)) {
+      const resolved = resolveConnectorNodes(
+        element as OrderedExcalidrawElement & ExcalidrawLinearElement,
+        activeMindMapNodes,
+      );
+      if (resolved) {
+        connectorParentByTargetId.set(resolved.targetId, resolved.sourceId);
+      }
+    }
+  }
   const deletedMindMapNodeIds = new Set<string>(
-    elements
+    restoredElements
       .filter(
         (element) =>
           element.isDeleted &&
@@ -1278,12 +1406,26 @@ export const synchronizeMindMapElements = (
       .map((element) => getMindMapElementMeta(element)?.nodeId || element.id),
   );
   const cascadedDeletedNodeIds = new Set(deletedMindMapNodeIds);
+  for (const element of restoredElements) {
+    if (element.isDeleted || !isMindMapNodeElement(element)) {
+      continue;
+    }
+    const meta = getMindMapElementMeta(element);
+    const nodeId = meta?.nodeId || element.id;
+    if (
+      meta?.parentId &&
+      !activeMindMapNodes.has(meta.parentId) &&
+      !connectorParentByTargetId.has(element.id)
+    ) {
+      cascadedDeletedNodeIds.add(nodeId);
+    }
+  }
 
   if (cascadedDeletedNodeIds.size) {
     let discovered = true;
     while (discovered) {
       discovered = false;
-      for (const element of elements) {
+      for (const element of restoredElements) {
         if (
           element.isDeleted ||
           (!isMindMapRootElement(element) && !isMindMapNodeElement(element))
@@ -1304,8 +1446,8 @@ export const synchronizeMindMapElements = (
     }
   }
 
-  let changed = false;
-  const baseElements = elements.map((element) => {
+  let changed = restoredElements.some((element, index) => element !== elements[index]);
+  const baseElements = restoredElements.map((element) => {
     if (element.isDeleted) {
       return element;
     }
@@ -1318,6 +1460,15 @@ export const synchronizeMindMapElements = (
       changed = true;
       return newElementWith(element, {
         isDeleted: true,
+        customData: {
+          ...element.customData,
+          mindMap: {
+            ...meta,
+            cascadeDeletedBy: deletedMindMapNodeIds.has(nodeId)
+              ? undefined
+              : meta?.parentId,
+          },
+        },
       }) as OrderedExcalidrawElement;
     }
     if (
@@ -1328,6 +1479,13 @@ export const synchronizeMindMapElements = (
       changed = true;
       return newElementWith(element, {
         isDeleted: true,
+        customData: {
+          ...element.customData,
+          mindMap: {
+            ...meta,
+            cascadeDeletedBy: meta?.sourceId || meta?.targetId,
+          },
+        },
       }) as OrderedExcalidrawElement;
     }
     return element;
@@ -1471,7 +1629,11 @@ export const synchronizeMindMapElements = (
                     timelineAxisX,
                   )
               : orientation === "horizontal"
-                ? createTimelineHorizontalBranchPoints(parentBox, childBox)
+                ? createTimelineHorizontalBranchPoints(
+                    parentBox,
+                    childBox,
+                    parent.lane !== undefined && parent.lane !== "center",
+                  )
                 : createTimelineVerticalBranchPoints(
                     parentBox,
                     childBox,
@@ -1763,7 +1925,7 @@ const createTimelineNodeElements = ({
     orientation === "horizontal"
       ? lane === "center"
         ? parent.element.x + parent.element.width + TIMELINE_HORIZONTAL_GAP_X
-        : parent.element.x + parent.element.width + TIMELINE_TEXT_GAP * 2
+        : parent.element.x + parent.element.width + TIMELINE_HORIZONTAL_BRANCH_GAP_X
       : lane === "left"
       ? parent.element.x - TIMELINE_VERTICAL_GAP_X - 80
       : lane === "right"
@@ -1771,7 +1933,9 @@ const createTimelineNodeElements = ({
       : parent.element.x;
   const provisionalY =
     orientation === "horizontal"
-      ? lane === "top"
+      ? parent.lane && parent.lane !== "center"
+        ? parent.element.y + parent.element.height / 2 - 12
+        : lane === "top"
         ? parent.element.y - 48
         : lane === "bottom"
         ? parent.element.y + 56
@@ -2057,6 +2221,15 @@ export const insertMindMapNode = ({
     entry.nodes.has(selectedNode.id),
   );
   if (!tree) {
+    return null;
+  }
+  const selectedMindMapNode = tree.nodes.get(selectedNode.id);
+  if (
+    selectedMindMapNode &&
+    isMindMapTimelineTemplate(tree.template) &&
+    selectedMindMapNode.lane &&
+    selectedMindMapNode.lane !== "center"
+  ) {
     return null;
   }
 

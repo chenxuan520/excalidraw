@@ -41,6 +41,11 @@ const MindMapPlusIcon = () => {
   );
 };
 
+const getNodeRightHandlePoint = (node: OrderedExcalidrawElement) => ({
+  x: node.x + node.width + MIND_MAP_PLUS_OFFSET,
+  y: node.y + node.height / 2,
+});
+
 export const MindMapNodeHandles = () => {
   const app = useApp();
   const appState = useExcalidrawAppState();
@@ -161,30 +166,40 @@ export const MindMapNodeHandles = () => {
   const containerRect = container.getBoundingClientRect();
   const timelineOrientation = getMindMapTimelineOrientation(activeTree.template);
   const isTimeline = getMindMapTemplateFamily(activeTree.template) === "timeline";
-  const childHandlePoint = getHandleScenePoint(childPreview, {
-    x: isTimeline
-    ? timelineOrientation === "vertical"
-      ? selectedNode.x + selectedNode.width / 2
-      : selectedNode.x + selectedNode.width + MIND_MAP_PLUS_OFFSET
-    : nextSide === "right"
-    ? selectedNode.x + selectedNode.width + MIND_MAP_PLUS_OFFSET
-    : selectedNode.x - MIND_MAP_PLUS_OFFSET,
-    y: isTimeline
-    ? timelineOrientation === "vertical"
-      ? selectedNode.y + selectedNode.height + MIND_MAP_PLUS_OFFSET
-      : selectedNode.y + selectedNode.height / 2
-    : selectedNode.y + selectedNode.height / 2,
-  });
-  const siblingHandlePoint = getHandleScenePoint(siblingPreview, {
-    x:
-      isTimeline && timelineOrientation === "vertical"
-        ? selectedNode.x + selectedNode.width + MIND_MAP_PLUS_OFFSET
-        : selectedNode.x + selectedNode.width / 2,
-    y:
-      isTimeline && timelineOrientation === "vertical"
-        ? selectedNode.y + selectedNode.height / 2
-        : selectedNode.y + selectedNode.height + MIND_MAP_PLUS_OFFSET,
-  });
+  const selectedMeta = getMindMapElementMeta(selectedNode);
+  if (isTimeline && selectedMeta?.lane && selectedMeta.lane !== "center") {
+    return null;
+  }
+  const childHandlePoint = getHandleScenePoint(
+    childPreview,
+    {
+      x: isTimeline
+        ? timelineOrientation === "vertical"
+          ? selectedNode.x + selectedNode.width / 2
+          : getNodeRightHandlePoint(selectedNode).x
+        : nextSide === "right"
+        ? getNodeRightHandlePoint(selectedNode).x
+        : selectedNode.x - MIND_MAP_PLUS_OFFSET,
+      y: isTimeline
+        ? timelineOrientation === "vertical"
+          ? selectedNode.y + selectedNode.height + MIND_MAP_PLUS_OFFSET
+          : getNodeRightHandlePoint(selectedNode).y
+        : selectedNode.y + selectedNode.height / 2,
+    },
+  );
+  const siblingHandlePoint = getHandleScenePoint(
+    siblingPreview,
+    {
+      x:
+        isTimeline && timelineOrientation === "vertical"
+          ? selectedNode.x + selectedNode.width + MIND_MAP_PLUS_OFFSET
+          : selectedNode.x + selectedNode.width / 2,
+      y:
+        isTimeline && timelineOrientation === "vertical"
+          ? selectedNode.y + selectedNode.height / 2
+          : selectedNode.y + selectedNode.height + MIND_MAP_PLUS_OFFSET,
+    },
+  );
   const siblingViewportPoint = sceneCoordsToViewportCoords(
     { sceneX: siblingHandlePoint.x, sceneY: siblingHandlePoint.y },
     appState,

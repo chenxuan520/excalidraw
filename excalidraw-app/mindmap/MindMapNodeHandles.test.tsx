@@ -279,6 +279,30 @@ describe("MindMapNodeHandles", () => {
     });
   });
 
+  it("does not show add handles for selected horizontal timeline branch nodes", async () => {
+    const elements = convertToExcalidrawElements(
+      createMindMapStencil("timeline-horizontal", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+    const selectedNode = elements.find(
+      (element) =>
+        isMindMapNodeElement(element) &&
+        getMindMapElementMeta(element)?.lane === "top",
+    )!;
+
+    excalidrawAPI.updateScene({
+      elements,
+      appState: {
+        selectedElementIds: { [selectedNode.id]: true },
+      },
+      storeAction: StoreAction.UPDATE,
+    });
+
+    await waitFor(() => {
+      expect(document.querySelector(".mind-map-node-handles__button")).toBeNull();
+    });
+  });
+
   it("adds a sibling node from a vertical timeline node", async () => {
     const elements = convertToExcalidrawElements(
       createMindMapStencil("timeline-vertical", "light", defaults),
