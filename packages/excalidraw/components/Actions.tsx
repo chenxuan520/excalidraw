@@ -47,6 +47,7 @@ import {
   laserPointerToolIcon,
   OpenAIIcon,
   MagicIcon,
+  MarkdownMindMapIcon,
 } from "./icons";
 import { KEYS } from "../keys";
 import { useTunnels } from "../context/tunnels";
@@ -405,6 +406,13 @@ export const ShapesSwitcher = ({
             data-testid="toolbar-embeddable"
           >
             {t("toolBar.mermaidToExcalidraw")}
+          </DropdownMenu.Item>
+          <DropdownMenu.Item
+            onSelect={() => app.setOpenDialog({ name: "markdownMindMap" })}
+            icon={MarkdownMindMapIcon}
+            data-testid="toolbar-markdown-mindmap"
+          >
+            {t("mindMap.markdown.menu")}
           </DropdownMenu.Item>
           {app.props.aiEnabled !== false && (
             <>

@@ -776,6 +776,20 @@
         "label": "纵向时间线",
         "description": "纵向主线加侧边事件"
       }
+    },
+    "markdown": {
+      "menu": "Markdown 转思维导图",
+      "title": "Markdown 转思维导图",
+      "description": "提取 Markdown 标题层级并生成可继续编辑的思维导图。如果没有 # 标题，则会回退识别类似 - item 的嵌套列表。",
+      "syntax": "Markdown",
+      "preview": "预览",
+      "button": "插入",
+      "placeholder": "# 主主题\n## 主题\n### 子主题\n\n- 或者嵌套列表\n  - 子项",
+      "style": "样式",
+      "font": "字体",
+      "maxDepth": "最大深度",
+      "defaultRoot": "Markdown",
+      "noHeadings": "请至少输入一个 Markdown 标题或嵌套列表项。"
     }
   },
   "alignmentAidsDialog": {

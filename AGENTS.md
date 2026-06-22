@@ -105,6 +105,7 @@ The repo uses custom scripts rather than a monorepo task runner.
 - After every `git push` in this repository, monitor the corresponding GitHub Actions runs with `gh` until the relevant `Tests` / `build_and_release` workflows finish successfully before considering the task done.
 - After every release tag push, additionally verify the GitHub Release asset `excalidraw-app.tar.gz` exists before stopping.
 - If a workflow fails, inspect the failed logs first with `gh run view <run-id> --log-failed`; if the failure is in a test file, rerun that exact file locally (repeat if needed to assess flakiness) before deciding whether to change product code or stabilize the test itself.
+- For UI/browser verification on this machine, use the locally installed Chrome app (or an existing local Chrome session). Do not download Playwright-managed Chrome/Chromium binaries just to test the page.
 
 ## Guidance from repo docs
 

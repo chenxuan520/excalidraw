@@ -724,6 +724,20 @@
         "label": "Vertical timeline",
         "description": "Top-down timeline with side events"
       }
+    },
+    "markdown": {
+      "menu": "Markdown to mind map",
+      "title": "Markdown to mind map",
+      "description": "Extract Markdown headings into an editable mind map. If there are no # headings, nested bullet lists such as - item are used instead.",
+      "syntax": "Markdown",
+      "preview": "Preview",
+      "button": "Insert",
+      "placeholder": "# Main topic\n## Topic\n### Subtopic\n\n- Or nested bullet lists\n  - Child item",
+      "style": "Style",
+      "font": "Font",
+      "maxDepth": "Max depth",
+      "defaultRoot": "Markdown",
+      "noHeadings": "Add at least one Markdown heading or nested bullet list item."
     }
   },
   "alignmentAidsDialog": {

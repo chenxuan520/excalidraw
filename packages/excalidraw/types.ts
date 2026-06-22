@@ -320,6 +320,7 @@ export interface AppState {
         tab: "text-to-diagram" | "diagram-to-code";
       }
     | { name: "ttd"; tab: "text-to-diagram" | "mermaid" }
+    | { name: "markdownMindMap" }
     | { name: "commandPalette" };
   /**
    * Reflects user preference for whether the default sidebar should be docked.

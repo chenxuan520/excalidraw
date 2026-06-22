@@ -133,6 +133,7 @@ import {
   MIND_MAP_SIDEBAR_TAB,
 } from "./mindmap/mindMapStencils";
 import { getMindMapPasteAnchor } from "./mindmap/MindMapSidebar";
+import { MarkdownToMindMapDialog } from "./mindmap/MarkdownToMindMapDialog";
 import { MindMapKeyboardShortcuts } from "./mindmap/MindMapKeyboardShortcuts";
 import { MindMapNodeHandles } from "./mindmap/MindMapNodeHandles";
 import { synchronizeMindMapElements } from "./mindmap/mindMapSystem";
@@ -1942,6 +1943,7 @@ const ExcalidrawWrapper = () => {
         <SequenceFragmentHandles />
         {alignmentAidsEnabled && <ElementAlignmentGuides />}
         {alignmentAidsEnabled && <SequenceParticipantAlignmentGuides />}
+        <MarkdownToMindMapDialog />
         <TTDDialog
           onTextSubmit={async (input) => {
             try {

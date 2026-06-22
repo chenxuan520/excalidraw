@@ -364,6 +364,23 @@ export const TextIcon = createIcon(
   tablerIconProps,
 );
 
+export const MarkdownMindMapIcon = createIcon(
+  <g strokeWidth="1.5">
+    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+    <line x1="4" y1="6" x2="9" y2="6" />
+    <line x1="4" y1="12" x2="7" y2="12" />
+    <line x1="4" y1="18" x2="9" y2="18" />
+    <path d="M10 6h3" />
+    <path d="M13 6v12" />
+    <path d="M13 12h2" />
+    <path d="M13 18h2" />
+    <circle cx="18.5" cy="6" r="1.5" />
+    <circle cx="18.5" cy="12" r="1.5" />
+    <circle cx="18.5" cy="18" r="1.5" />
+  </g>,
+  tablerIconProps,
+);
+
 // modified tabler-icons: photo
 export const ImageIcon = createIcon(
   <g strokeWidth="1.25">
