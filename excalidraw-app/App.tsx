@@ -25,7 +25,6 @@ import {
   Excalidraw,
   FooterRight,
   TTDDialog,
-  TTDDialogTrigger,
   StoreAction,
   reconcileElements,
 } from "../packages/excalidraw";
@@ -1945,6 +1944,7 @@ const ExcalidrawWrapper = () => {
         {alignmentAidsEnabled && <SequenceParticipantAlignmentGuides />}
         <MarkdownToMindMapDialog />
         <TTDDialog
+          disableTextToDiagram={true}
           onTextSubmit={async (input) => {
             try {
               const response = await fetch(
@@ -2001,7 +2001,6 @@ const ExcalidrawWrapper = () => {
             }
           }}
         />
-        <TTDDialogTrigger />
 
         <WebDAVLoginDialog
           isOpen={isWebDAVLoginOpen}

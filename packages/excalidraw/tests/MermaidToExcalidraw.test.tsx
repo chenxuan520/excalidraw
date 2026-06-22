@@ -1,8 +1,12 @@
-import { act, render, waitFor } from "./test-utils";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "./test-utils";
 import { Excalidraw } from "../index";
 import { expect } from "vitest";
 import { getTextEditor, updateTextEditor } from "./queries/dom";
 import { mockMermaidToExcalidraw } from "./helpers/mocks";
+import { FONT_FAMILY } from "../constants";
+import { TTDDialogBase } from "../components/TTDDialog/TTDDialog";
+import { API } from "./helpers/api";
+import { applyMermaidFontFamily } from "../components/TTDDialog/common";
 
 mockMermaidToExcalidraw({
   mockRef: true,
@@ -122,5 +126,51 @@ describe("Test <MermaidToExcalidraw/>", () => {
     expect(
       dialog.querySelector('[data-testid="mermaid-error"]'),
     ).toMatchInlineSnapshot("null");
+  });
+
+  it("should apply selected font family to converted mermaid text elements", async () => {
+    const text = API.createElement({ type: "text", text: "Label" });
+    const rect = API.createElement({ type: "rectangle" });
+
+    const updated = applyMermaidFontFamily(
+      [text, rect] as any,
+      FONT_FAMILY.Helvetica,
+    ) as readonly { type: string; fontFamily?: number; lineHeight?: number }[];
+
+    expect(updated[0]?.fontFamily).toBe(FONT_FAMILY.Helvetica);
+    expect(updated[1]?.fontFamily).toBeUndefined();
+  });
+
+  it("should normalize br tags in converted mermaid text", () => {
+    const text = API.createElement({
+      type: "text",
+      text: "foo\n<br>\nbar",
+      fontFamily: FONT_FAMILY.Excalifont,
+    });
+
+    const updated = applyMermaidFontFamily(
+      [text] as any,
+      FONT_FAMILY.Helvetica,
+    ) as readonly { text?: string; fontFamily?: number }[];
+
+    expect(updated[0]?.text).toBe("foo\nbar");
+    expect(updated[0]?.fontFamily).toBe(FONT_FAMILY.Helvetica);
+  });
+
+  it("should hide text to diagram tab when disabled", async () => {
+    cleanup();
+
+    await render(
+      <Excalidraw>
+        <TTDDialogBase
+          tab="mermaid"
+          disableTextToDiagram={true}
+          onTextSubmit={async () => ({ generatedResponse: undefined })}
+        />
+      </Excalidraw>,
+    );
+
+    expect(screen.queryByText(/Text to diagram/i)).toBeNull();
+    expect(screen.getByText(/^Mermaid$/i)).toBeTruthy();
   });
 });

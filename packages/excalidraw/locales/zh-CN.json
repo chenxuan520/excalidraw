@@ -621,7 +621,8 @@
     "button": "插入",
     "description": "目前仅支持<flowchartLink>流程图</flowchartLink>、<sequenceLink>序列图</sequenceLink>和<classLink>类图</classLink>。其他类型在 Excalidraw 中将以图像呈现。",
     "syntax": "Mermaid 语法",
-    "preview": "预览"
+    "preview": "预览",
+    "font": "字体"
   },
   "sequenceDiagram": {
     "tab": "时序图",

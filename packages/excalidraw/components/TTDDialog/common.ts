@@ -2,11 +2,21 @@ import type { MermaidConfig } from "@excalidraw/mermaid-to-excalidraw";
 import type { MermaidToExcalidrawResult } from "@excalidraw/mermaid-to-excalidraw/dist/interfaces";
 import { DEFAULT_EXPORT_PADDING, EDITOR_LS_KEYS } from "../../constants";
 import { convertToExcalidrawElements, exportToCanvas } from "../../index";
+import { getLineHeight } from "../../fonts";
 import type { NonDeletedExcalidrawElement } from "../../element/types";
+import type { FontFamilyValues } from "../../element/types";
+import { isTextElement } from "../../element/typeChecks";
+import { newElementWith } from "../../element/mutateElement";
 import type { AppClassProperties, BinaryFiles } from "../../types";
 import { canvasToBlob } from "../../data/blob";
 import { EditorLocalStorage } from "../../data/EditorLocalStorage";
 import { t } from "../../i18n";
+
+const normalizeMermaidText = (text: string) => {
+  return text
+    .replace(/\s*<br\s*\/?>\s*/gi, "\n")
+    .replace(/\n{3,}/g, "\n\n");
+};
 
 const resetPreview = ({
   canvasRef,
@@ -43,6 +53,7 @@ interface ConvertMermaidToExcalidrawFormatProps {
   canvasRef: React.RefObject<HTMLDivElement>;
   mermaidToExcalidrawLib: MermaidToExcalidrawLibProps;
   mermaidDefinition: string;
+  fontFamily?: FontFamilyValues;
   setError: (error: Error | null) => void;
   data: React.MutableRefObject<{
     elements: readonly NonDeletedExcalidrawElement[];
@@ -50,10 +61,33 @@ interface ConvertMermaidToExcalidrawFormatProps {
   }>;
 }
 
+export const applyMermaidFontFamily = (
+  elements: readonly NonDeletedExcalidrawElement[],
+  fontFamily: FontFamilyValues | undefined,
+) => {
+  if (!fontFamily) {
+    return elements;
+  }
+
+  return elements.map((element) => {
+    if (!isTextElement(element)) {
+      return element;
+    }
+
+    return newElementWith(element, {
+      text: normalizeMermaidText(element.text),
+      originalText: normalizeMermaidText(element.text),
+      fontFamily,
+      lineHeight: getLineHeight(fontFamily),
+    }) as NonDeletedExcalidrawElement;
+  });
+};
+
 export const convertMermaidToExcalidraw = async ({
   canvasRef,
   mermaidToExcalidrawLib,
   mermaidDefinition,
+  fontFamily,
   setError,
   data,
 }: ConvertMermaidToExcalidrawFormatProps) => {
@@ -84,9 +118,12 @@ export const convertMermaidToExcalidraw = async ({
     setError(null);
 
     data.current = {
-      elements: convertToExcalidrawElements(elements, {
-        regenerateIds: true,
-      }),
+      elements: applyMermaidFontFamily(
+        convertToExcalidrawElements(elements, {
+          regenerateIds: true,
+        }),
+        fontFamily,
+      ),
       files,
     };
 

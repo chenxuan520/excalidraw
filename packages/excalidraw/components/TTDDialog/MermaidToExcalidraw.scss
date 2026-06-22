@@ -7,4 +7,73 @@
       padding-inline: 2.5rem;
     }
   }
+
+  .dialog-mermaid-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+
+    &__chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      min-height: 1.75rem;
+      padding: 0.2rem 0.55rem;
+      border-radius: 0.625rem;
+      border: 1px solid var(--dialog-border-color);
+      background: var(--color-surface-low);
+      color: var(--color-on-surface);
+      user-select: none;
+    }
+
+    &__label {
+      font-size: 0.625rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      color: var(--color-on-surface-variant);
+      white-space: nowrap;
+    }
+
+    &__select-wrap {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      min-width: 0;
+    }
+
+    &__select {
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      font-size: 0.75rem;
+      font-weight: 600;
+      line-height: 1.1;
+      min-width: 0;
+      height: 1.05rem;
+      max-width: 11rem;
+      cursor: pointer;
+      padding: 0 0.8rem 0 0;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+
+    &__select-icon {
+      position: absolute;
+      right: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      color: var(--color-on-surface-variant);
+
+      svg {
+        width: 0.8rem;
+        height: 0.8rem;
+      }
+    }
+  }
 }

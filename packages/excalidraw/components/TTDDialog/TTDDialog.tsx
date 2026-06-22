@@ -59,6 +59,7 @@ export const TTDDialog = (
   props:
     | {
         onTextSubmit(value: string): Promise<OnTestSubmitRetValue>;
+        disableTextToDiagram?: boolean;
       }
     | { __fallback: true },
 ) => {
@@ -84,6 +85,7 @@ export const TTDDialogBase = withInternalFallback(
   } & (
     | {
         onTextSubmit(value: string): Promise<OnTestSubmitRetValue>;
+        disableTextToDiagram?: boolean;
       }
     | { __fallback: true }
   )) => {
@@ -225,6 +227,12 @@ export const TTDDialogBase = withInternalFallback(
     }>({ elements: [], files: null });
 
     const [error, setError] = useState<Error | null>(null);
+    const shouldHideTextToDiagram =
+      !("__fallback" in rest) && !!rest.disableTextToDiagram;
+    const shouldUseSingleMermaidTab =
+      ("__fallback" in rest && rest.__fallback) || shouldHideTextToDiagram;
+    const activeTab =
+      shouldHideTextToDiagram && tab === "text-to-diagram" ? "mermaid" : tab;
 
     return (
       <Dialog
@@ -237,9 +245,17 @@ export const TTDDialogBase = withInternalFallback(
         {...rest}
         autofocus={false}
       >
-        <TTDDialogTabs dialog="ttd" tab={tab}>
-          {"__fallback" in rest && rest.__fallback ? (
-            <p className="dialog-mermaid-title">{t("mermaid.title")}</p>
+        <TTDDialogTabs dialog="ttd" tab={activeTab}>
+          {shouldUseSingleMermaidTab ? (
+            <div className="ttd-dialog-triggers">
+              <button
+                type="button"
+                className="ttd-dialog-tab-trigger"
+                data-state="active"
+              >
+                Mermaid
+              </button>
+            </div>
           ) : (
             <TTDDialogTabTriggers>
               <TTDDialogTabTrigger tab="text-to-diagram">
@@ -271,7 +287,7 @@ export const TTDDialogBase = withInternalFallback(
               mermaidToExcalidrawLib={mermaidToExcalidrawLib}
             />
           </TTDDialogTab>
-          {!("__fallback" in rest) && (
+          {!("__fallback" in rest) && !shouldHideTextToDiagram && (
             <TTDDialogTab className="ttd-dialog-content" tab="text-to-diagram">
               <div className="ttd-dialog-desc">
                 Currently we use Mermaid as a middle step, so you'll get best
