@@ -3,10 +3,11 @@ import { Excalidraw } from "../index";
 import { expect } from "vitest";
 import { getTextEditor, updateTextEditor } from "./queries/dom";
 import { mockMermaidToExcalidraw } from "./helpers/mocks";
-import { FONT_FAMILY } from "../constants";
+import { EDITOR_LS_KEYS, FONT_FAMILY } from "../constants";
 import { TTDDialogBase } from "../components/TTDDialog/TTDDialog";
 import { API } from "./helpers/api";
 import { applyMermaidFontFamily } from "../components/TTDDialog/common";
+import { convertToExcalidrawElements } from "../data/transform";
 
 mockMermaidToExcalidraw({
   mockRef: true,
@@ -80,6 +81,8 @@ mockMermaidToExcalidraw({
 
 describe("Test <MermaidToExcalidraw/>", () => {
   beforeEach(async () => {
+    localStorage.clear();
+
     await render(
       <Excalidraw
         initialData={{
@@ -141,20 +144,70 @@ describe("Test <MermaidToExcalidraw/>", () => {
     expect(updated[1]?.fontFamily).toBeUndefined();
   });
 
-  it("should normalize br tags in converted mermaid text", () => {
-    const text = API.createElement({
-      type: "text",
-      text: "foo\n<br>\nbar",
-      fontFamily: FONT_FAMILY.Excalifont,
-    });
+  it.each(["<br>", "<br/>", "<br />"])(
+    "should normalize %s tags in converted mermaid text",
+    (lineBreakTag) => {
+      const text = API.createElement({
+        type: "text",
+        text: `foo\n${lineBreakTag}\nbar`,
+        fontFamily: FONT_FAMILY.Excalifont,
+      });
+
+      const updated = applyMermaidFontFamily(
+        [text] as any,
+        FONT_FAMILY.Helvetica,
+      ) as readonly { text?: string; fontFamily?: number }[];
+
+      expect(updated[0]?.text).toBe("foo\nbar");
+      expect(updated[0]?.fontFamily).toBe(FONT_FAMILY.Helvetica);
+    },
+  );
+
+  it("should reflow bound labels after normalizing mermaid line breaks", () => {
+    const converted = convertToExcalidrawElements(
+      [
+        {
+          type: "rectangle",
+          x: 0,
+          y: 0,
+          width: 320,
+          height: 80,
+          label: {
+            text: "Interface<br/>接入口",
+          },
+        },
+      ],
+      { regenerateIds: false },
+    ) as readonly {
+      type: string;
+      text?: string;
+      originalText?: string;
+      containerId?: string | null;
+      height?: number;
+    }[];
+
+    const initialLabel = converted.find(
+      (element) => element.type === "text" && element.containerId,
+    )!;
 
     const updated = applyMermaidFontFamily(
-      [text] as any,
+      converted as any,
       FONT_FAMILY.Helvetica,
-    ) as readonly { text?: string; fontFamily?: number }[];
+    ) as readonly {
+      type: string;
+      text?: string;
+      originalText?: string;
+      containerId?: string | null;
+      height?: number;
+    }[];
 
-    expect(updated[0]?.text).toBe("foo\nbar");
-    expect(updated[0]?.fontFamily).toBe(FONT_FAMILY.Helvetica);
+    const updatedLabel = updated.find(
+      (element) => element.type === "text" && element.containerId,
+    )!;
+
+    expect(updatedLabel.text).toBe("Interface\n接入口");
+    expect(updatedLabel.originalText).toBe("Interface\n接入口");
+    expect(updatedLabel.height).toBeGreaterThan(initialLabel.height || 0);
   });
 
   it("should hide text to diagram tab when disabled", async () => {
@@ -172,5 +225,41 @@ describe("Test <MermaidToExcalidraw/>", () => {
 
     expect(screen.queryByText(/Text to diagram/i)).toBeNull();
     expect(screen.getByText(/^Mermaid$/i)).toBeTruthy();
+  });
+
+  it("should restore persisted font family selection", async () => {
+    cleanup();
+    localStorage.setItem(
+      EDITOR_LS_KEYS.MERMAID_TO_EXCALIDRAW_FONT_FAMILY,
+      JSON.stringify(FONT_FAMILY.Helvetica),
+    );
+
+    await render(
+      <Excalidraw
+        initialData={{
+          appState: {
+            openDialog: { name: "ttd", tab: "mermaid" },
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByLabelText("Font")).toHaveValue(
+      String(FONT_FAMILY.Helvetica),
+    );
+  });
+
+  it("should persist selected font family", async () => {
+    const select = screen.getByLabelText("Font");
+
+    fireEvent.change(select, {
+      target: { value: String(FONT_FAMILY.Helvetica) },
+    });
+
+    await waitFor(() => {
+      expect(localStorage.getItem(EDITOR_LS_KEYS.MERMAID_TO_EXCALIDRAW_FONT_FAMILY)).toBe(
+        JSON.stringify(FONT_FAMILY.Helvetica),
+      );
+    });
   });
 });

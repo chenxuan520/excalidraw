@@ -1,9 +1,20 @@
-import { convertToExcalidrawElements } from "../../packages/excalidraw";
+import React from "react";
+import { Excalidraw, convertToExcalidrawElements } from "../../packages/excalidraw";
 import {
+  fireEvent,
+  queryByTestId,
+  render,
+  waitFor,
+  withExcalidrawDimensions,
+} from "../../packages/excalidraw/tests/test-utils";
+import { MIND_MAP_SIDEBAR_TAB } from "../mindmap/mindMapStencils";
+import {
+  SequenceDiagramSidebar,
   getSequenceDragAnchor,
   getSequencePasteAnchor,
 } from "./SequenceDiagramSidebar";
 import {
+  SEQUENCE_DIAGRAM_SIDEBAR_TAB,
   createSequenceStencil,
   type SequenceStencilDefaults,
 } from "./sequenceStencils";
@@ -108,4 +119,52 @@ describe("getSequenceDragAnchor", () => {
 
     expect(getSequencePasteAnchor([...lane, ...rectangle])).toBeUndefined();
   });
+});
+
+describe("SequenceDiagramSidebar docking", () => {
+  it.each([
+    ["sequence diagram", SEQUENCE_DIAGRAM_SIDEBAR_TAB],
+    ["mind map", MIND_MAP_SIDEBAR_TAB],
+  ])(
+    "opens %s tab undocked by default but allows pinning",
+    async (_label, tab) => {
+      const { container } = await render(
+        React.createElement(
+          Excalidraw,
+          {
+            initialData: {
+              appState: {
+                openSidebar: { name: "default", tab },
+              },
+            },
+          },
+          React.createElement(SequenceDiagramSidebar, {
+            onRequestDirectionChange: () => {},
+          }),
+        ),
+      );
+
+      await withExcalidrawDimensions({ width: 1920, height: 1080 }, async () => {
+        const sidebar = await waitFor(() => {
+          const node = container.querySelector<HTMLElement>(".sidebar");
+          expect(node).not.toBeNull();
+          return node!;
+        });
+
+        expect(sidebar).not.toHaveClass("sidebar--docked");
+
+        const dockButton = queryByTestId(sidebar, "sidebar-dock");
+        expect(dockButton).not.toBeNull();
+
+        fireEvent.click(dockButton!);
+
+        await waitFor(() => {
+          expect(sidebar).toHaveClass("sidebar--docked");
+          expect((window as any).h.state.defaultSidebarDockedPreference).toBe(
+            true,
+          );
+        });
+      });
+    },
+  );
 });

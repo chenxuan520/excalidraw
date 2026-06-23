@@ -7,10 +7,12 @@ import type { NonDeletedExcalidrawElement } from "../../element/types";
 import type { FontFamilyValues } from "../../element/types";
 import { isTextElement } from "../../element/typeChecks";
 import { newElementWith } from "../../element/mutateElement";
+import { redrawTextBoundingBox } from "../../element/textElement";
 import type { AppClassProperties, BinaryFiles } from "../../types";
 import { canvasToBlob } from "../../data/blob";
 import { EditorLocalStorage } from "../../data/EditorLocalStorage";
 import { t } from "../../i18n";
+import { arrayToMap } from "../../utils";
 
 const normalizeMermaidText = (text: string) => {
   return text
@@ -65,22 +67,37 @@ export const applyMermaidFontFamily = (
   elements: readonly NonDeletedExcalidrawElement[],
   fontFamily: FontFamilyValues | undefined,
 ) => {
-  if (!fontFamily) {
-    return elements;
-  }
-
-  return elements.map((element) => {
+  const updatedElements = elements.map((element) => {
     if (!isTextElement(element)) {
       return element;
     }
 
     return newElementWith(element, {
       text: normalizeMermaidText(element.text),
-      originalText: normalizeMermaidText(element.text),
-      fontFamily,
-      lineHeight: getLineHeight(fontFamily),
+      originalText: normalizeMermaidText(element.originalText),
+      ...(fontFamily
+        ? {
+            fontFamily,
+            lineHeight: getLineHeight(fontFamily),
+          }
+        : {}),
     }) as NonDeletedExcalidrawElement;
   });
+
+  const elementsMap = arrayToMap(updatedElements);
+  updatedElements.forEach((element) => {
+    if (!isTextElement(element)) {
+      return;
+    }
+
+    const container = element.containerId
+      ? elementsMap.get(element.containerId) || null
+      : null;
+
+    redrawTextBoundingBox(element, container, elementsMap, false);
+  });
+
+  return updatedElements;
 };
 
 export const convertMermaidToExcalidraw = async ({

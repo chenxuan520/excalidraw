@@ -50,6 +50,16 @@ const getFontLabel = (fontFamily: number) => {
   );
 };
 
+const getPersistedMermaidFontFamily = (): FontFamilyValues => {
+  const storedFontFamily = EditorLocalStorage.get<number>(
+    EDITOR_LS_KEYS.MERMAID_TO_EXCALIDRAW_FONT_FAMILY,
+  );
+
+  return MERMAID_FONT_OPTIONS.includes(storedFontFamily as FontFamilyValues)
+    ? (storedFontFamily as FontFamilyValues)
+    : FONT_FAMILY.Excalifont;
+};
+
 const MermaidToExcalidraw = ({
   mermaidToExcalidrawLib,
 }: {
@@ -61,9 +71,8 @@ const MermaidToExcalidraw = ({
       MERMAID_EXAMPLE,
   );
   const deferredText = useDeferredValue(text.trim());
-  const [fontFamily, setFontFamily] = useState<FontFamilyValues>(
-    FONT_FAMILY.Excalifont,
-  );
+  const [fontFamily, setFontFamily] =
+    useState<FontFamilyValues>(getPersistedMermaidFontFamily);
   const [error, setError] = useState<Error | null>(null);
 
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -97,6 +106,13 @@ const MermaidToExcalidraw = ({
     },
     [],
   );
+
+  useEffect(() => {
+    EditorLocalStorage.set(
+      EDITOR_LS_KEYS.MERMAID_TO_EXCALIDRAW_FONT_FAMILY,
+      fontFamily,
+    );
+  }, [fontFamily]);
 
   const onInsertToEditor = () => {
     insertToEditor({

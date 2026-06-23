@@ -415,11 +415,6 @@ export const SequenceDiagramSidebar = ({
   const appState = useExcalidrawAppState();
   const { t } = useI18n();
 
-  const isDiagramSidebarOpen =
-    appState.openSidebar?.name === "default" &&
-    (appState.openSidebar?.tab === SEQUENCE_DIAGRAM_SIDEBAR_TAB ||
-      appState.openSidebar?.tab === MIND_MAP_SIDEBAR_TAB);
-
   const defaults = getSequenceStencilDefaults(t);
 
   const getFallbackInsertPosition = () => {
@@ -643,9 +638,8 @@ export const SequenceDiagramSidebar = ({
   };
 
   return (
-      <>
-      <DefaultSidebar docked={isDiagramSidebarOpen ? true : undefined}>
-        <MindMapSidebarTab />
+    <>
+      <DefaultSidebar>
         <Sidebar.Tab tab={SEQUENCE_DIAGRAM_SIDEBAR_TAB}>
           <div className="sequence-diagram-sidebar">
             <div className="sequence-diagram-sidebar__intro">
@@ -715,6 +709,7 @@ export const SequenceDiagramSidebar = ({
             </p>
           </div>
         </Sidebar.Tab>
+        <MindMapSidebarTab />
       </DefaultSidebar>
 
       <DefaultSidebar.TabTriggers>
@@ -725,7 +720,6 @@ export const SequenceDiagramSidebar = ({
         >
           {LibraryIcon}
         </Sidebar.TabTrigger>
-        <MindMapSidebarTabTrigger />
         <Sidebar.TabTrigger
           tab={SEQUENCE_DIAGRAM_SIDEBAR_TAB}
           title={t("sequenceDiagram.tab")}
@@ -733,6 +727,7 @@ export const SequenceDiagramSidebar = ({
         >
           <SequenceDiagramIcon className="sequence-diagram-sidebar__tab-icon" />
         </Sidebar.TabTrigger>
+        <MindMapSidebarTabTrigger />
       </DefaultSidebar.TabTriggers>
     </>
   );
