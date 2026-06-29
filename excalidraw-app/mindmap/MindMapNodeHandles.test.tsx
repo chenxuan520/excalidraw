@@ -237,11 +237,12 @@ describe("MindMapNodeHandles", () => {
     });
   });
 
-  it("adds a sibling node after a selected horizontal timeline center node", async () => {
+  it("hides the branch handle for a horizontal timeline center node that already has a branch", async () => {
     const elements = convertToExcalidrawElements(
       createMindMapStencil("timeline-horizontal", "light", defaults),
       { regenerateIds: false },
     ) as OrderedExcalidrawElement[];
+    // the first center node already carries a top branch in the stencil
     const selectedNode = elements.find(
       (element) =>
         isMindMapNodeElement(element) &&
@@ -257,26 +258,17 @@ describe("MindMapNodeHandles", () => {
       storeAction: StoreAction.UPDATE,
     });
 
-    const button = await waitFor(() => {
-      const node = document.querySelector(
-        ".mind-map-node-handles__button--sibling",
-      ) as HTMLButtonElement | null;
-      expect(node).toBeTruthy();
-      return node!;
-    });
-
-    fireEvent.click(button);
-
+    // the child handle (extend the main axis) is still available
     await waitFor(() => {
-      const insertedId = Object.keys(window.h.state.selectedElementIds)[0]!;
-      const insertedNode = window.h.elements.find(
-        (element) => element.id === insertedId,
-      )!;
-
-      expect(getMindMapElementMeta(insertedNode)?.lane).toBe("top");
-      expect(getMindMapElementMeta(insertedNode)?.parentId).toBe(selectedNode.id);
-      expect(insertedNode.y).toBeLessThan(selectedNode.y);
+      expect(
+        document.querySelector(".mind-map-node-handles__button"),
+      ).toBeTruthy();
     });
+
+    // but the branch/sibling handle must not be shown, to avoid a duplicate
+    expect(
+      document.querySelector(".mind-map-node-handles__button--sibling"),
+    ).toBeNull();
   });
 
   it("does not show add handles for selected horizontal timeline branch nodes", async () => {

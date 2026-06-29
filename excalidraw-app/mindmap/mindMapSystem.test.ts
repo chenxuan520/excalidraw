@@ -1,6 +1,7 @@
 import { convertToExcalidrawElements } from "../../packages/excalidraw";
 import { syncInvalidIndices } from "../../packages/excalidraw/fractionalIndex";
 import { newElementWith } from "../../packages/excalidraw/element/mutateElement";
+import { duplicateElements } from "../../packages/excalidraw/element/newElement";
 import type {
   ExcalidrawTextElement,
   OrderedExcalidrawElement,
@@ -337,11 +338,12 @@ describe("mind map system", () => {
     );
   });
 
-  it("inserts a horizontal timeline sibling after the selected center node", () => {
+  it("does not add a duplicate branch to a horizontal timeline center node that already has one", () => {
     const elements = convertToExcalidrawElements(
       createMindMapStencil("timeline-horizontal", "light", defaults),
       { regenerateIds: false },
     ) as OrderedExcalidrawElement[];
+    // the first center node already ships with a top branch in the stencil
     const selectedNode = elements.find(
       (element) =>
         isMindMapNodeElement(element) &&
@@ -349,21 +351,53 @@ describe("mind map system", () => {
         getMindMapElementMeta(element)?.order === 0,
     )!;
 
-    const synced = insertMindMapNode({
+    const result = insertMindMapNode({
       elements,
       selectedElementIds: { [selectedNode.id]: true },
       mode: "sibling",
       defaults,
-    })!;
-    const insertedId = Object.keys(synced.selectedElementIds)[0]!;
-    const insertedNode = synced.elements.find(
-      (element) => element.id === insertedId,
+    });
+
+    expect(result).toBeNull();
+  });
+
+  it("adds a branch to a horizontal timeline center node that has none yet", () => {
+    const elements = convertToExcalidrawElements(
+      createMindMapStencil("timeline-horizontal", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+    const lastCenter = elements.find(
+      (element) =>
+        isMindMapNodeElement(element) &&
+        getMindMapElementMeta(element)?.lane === "center" &&
+        getMindMapElementMeta(element)?.order === 1,
     )!;
 
-    expect(getMindMapElementMeta(insertedNode)?.lane).toBe("top");
-    expect(getMindMapElementMeta(insertedNode)?.parentId).toBe(selectedNode.id);
-    expect(insertedNode.y).toBeLessThan(selectedNode.y);
-    expect(insertedNode.x).toBeGreaterThan(selectedNode.x);
+    // extend the main axis to obtain a fresh center node without any branch
+    const extended = insertMindMapNode({
+      elements,
+      selectedElementIds: { [lastCenter.id]: true },
+      mode: "child",
+      defaults,
+    })!;
+    const freshCenterId = Object.keys(extended.selectedElementIds)[0]!;
+
+    const branched = insertMindMapNode({
+      elements: extended.elements,
+      selectedElementIds: { [freshCenterId]: true },
+      mode: "sibling",
+      defaults,
+    });
+
+    expect(branched).not.toBeNull();
+    const branchId = Object.keys(branched!.selectedElementIds)[0]!;
+    const branchNode = branched!.elements.find(
+      (element) => element.id === branchId,
+    )!;
+    const branchLane = getMindMapElementMeta(branchNode)?.lane;
+
+    expect(branchLane === "top" || branchLane === "bottom").toBe(true);
+    expect(getMindMapElementMeta(branchNode)?.parentId).toBe(freshCenterId);
   });
 
   it("does not insert from horizontal timeline branch nodes", () => {
@@ -789,5 +823,160 @@ describe("mind map system", () => {
         expect(element.isDeleted).toBe(true);
       }
     }
+  });
+
+  it("keeps every vertical timeline node after element ids are regenerated on insert", () => {
+    const stencil = convertToExcalidrawElements(
+      createMindMapStencil("timeline-vertical", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+    // mirrors the library/paste/drag insert path, which regenerates element
+    // ids without remapping our customData.mindMap references
+    const pasted = duplicateElements(stencil, {
+      randomizeSeed: true,
+    }) as OrderedExcalidrawElement[];
+
+    const pastedRoot = pasted.find(isMindMapRootElement)!;
+    expect(getMindMapElementMeta(pastedRoot)?.nodeId).not.toBe(pastedRoot.id);
+
+    const synced = synchronizeMindMapElements(pasted);
+    const liveNodes = synced.elements.filter(
+      (element) => isMindMapNodeElement(element) && !element.isDeleted,
+    );
+    const centerNodes = liveNodes.filter(
+      (element) => getMindMapElementMeta(element)?.lane === "center",
+    );
+
+    expect(liveNodes).toHaveLength(4);
+    expect(centerNodes).toHaveLength(4);
+
+    const liveIds = new Set(
+      synced.elements
+        .filter((element) => !element.isDeleted)
+        .map((element) => element.id),
+    );
+    for (const node of liveNodes) {
+      expect(liveIds.has(getMindMapElementMeta(node)?.parentId || "")).toBe(true);
+    }
+  });
+
+  it("keeps every horizontal timeline node after element ids are regenerated on insert", () => {
+    const stencil = convertToExcalidrawElements(
+      createMindMapStencil("timeline-horizontal", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+    const pasted = duplicateElements(stencil, {
+      randomizeSeed: true,
+    }) as OrderedExcalidrawElement[];
+
+    const synced = synchronizeMindMapElements(pasted);
+    const liveNodes = synced.elements.filter(
+      (element) => isMindMapNodeElement(element) && !element.isDeleted,
+    );
+
+    expect(liveNodes).toHaveLength(4);
+
+    const liveIds = new Set(
+      synced.elements
+        .filter((element) => !element.isDeleted)
+        .map((element) => element.id),
+    );
+    for (const node of liveNodes) {
+      expect(liveIds.has(getMindMapElementMeta(node)?.parentId || "")).toBe(true);
+    }
+  });
+
+  it("still cascade-deletes descendants when a regenerated timeline root is removed", () => {
+    const stencil = convertToExcalidrawElements(
+      createMindMapStencil("timeline-vertical", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+    const pasted = duplicateElements(stencil, {
+      randomizeSeed: true,
+    }) as OrderedExcalidrawElement[];
+    const settled = synchronizeMindMapElements(pasted).elements;
+    const root = settled.find(
+      (element) => isMindMapRootElement(element) && !element.isDeleted,
+    )!;
+    const childIds = new Set(
+      settled
+        .filter(
+          (element) => isMindMapNodeElement(element) && !element.isDeleted,
+        )
+        .map((element) => element.id),
+    );
+    expect(childIds.size).toBe(4);
+
+    const afterDelete = synchronizeMindMapElements(
+      settled.filter((element) => element.id !== root.id),
+    );
+
+    for (const childId of childIds) {
+      expect(
+        afterDelete.elements.find((element) => element.id === childId)?.isDeleted,
+      ).toBe(true);
+    }
+  });
+
+  it("connects horizontal timeline center nodes edge-to-edge along a continuous axis", () => {
+    const elements = convertToExcalidrawElements(
+      createMindMapStencil("timeline-horizontal", "light", defaults),
+      { regenerateIds: false },
+    ) as OrderedExcalidrawElement[];
+    const synced = synchronizeMindMapElements(elements);
+
+    const root = synced.elements.find(
+      (element) => isMindMapRootElement(element) && !element.isDeleted,
+    )!;
+    const centerNodes = (
+      synced.elements.filter(
+        (element) =>
+          isMindMapNodeElement(element) &&
+          !element.isDeleted &&
+          getMindMapElementMeta(element)?.lane === "center",
+      ) as OrderedExcalidrawElement[]
+    ).sort((left, right) => left.x - right.x);
+
+    expect(centerNodes.length).toBeGreaterThanOrEqual(2);
+
+    // The main axis should never render as a (gapped) trunk connector anymore;
+    // it is built from continuous edge-to-edge segments between center nodes.
+    const trunks = synced.elements.filter(
+      (element) =>
+        isMindMapConnectorElement(element) &&
+        !element.isDeleted &&
+        getMindMapElementMeta(element)?.part === "trunk",
+    );
+    expect(trunks).toHaveLength(0);
+
+    const axisSegment = (targetId: string) => {
+      const connector = synced.elements.find(
+        (element) =>
+          isMindMapConnectorElement(element) &&
+          !element.isDeleted &&
+          getMindMapElementMeta(element)?.targetId === targetId,
+      ) as (OrderedExcalidrawElement & { points: [number, number][] }) | undefined;
+      if (!connector) {
+        throw new Error("missing axis connector");
+      }
+      return connector.points.map(
+        ([px, py]) => [connector.x + px, connector.y + py] as [number, number],
+      );
+    };
+
+    // root -> first center node touches both edges and is perfectly horizontal
+    const rootSegment = axisSegment(centerNodes[0]!.id);
+    expect(rootSegment).toHaveLength(2);
+    expect(rootSegment[0]![1]).toBeCloseTo(rootSegment[1]![1], 1);
+    expect(rootSegment[0]![0]).toBeCloseTo(root.x + root.width, 1);
+    expect(rootSegment[1]![0]).toBeCloseTo(centerNodes[0]!.x, 1);
+
+    // center -> next center node also connects edge-to-edge with no floating gap
+    const nextSegment = axisSegment(centerNodes[1]!.id);
+    expect(nextSegment[0]![0]).toBeCloseTo(
+      centerNodes[0]!.x + centerNodes[0]!.width,
+      1,
+    );
+    expect(nextSegment[1]![0]).toBeCloseTo(centerNodes[1]!.x, 1);
   });
 });

@@ -23,9 +23,9 @@ describe("defaultLibraryItems", () => {
       "左箭头",
       "右箭头",
       "双向箭头",
-      "云朵",
       "数据库",
       "消息队列",
+      "火柴人",
     ]);
   });
 
@@ -38,9 +38,9 @@ describe("defaultLibraryItems", () => {
       "Left arrow",
       "Right arrow",
       "Bidirectional arrow",
-      "Cloud",
       "Database",
       "Message Queue",
+      "Stick figure",
     ]);
     expect(
       items
@@ -128,6 +128,13 @@ describe("defaultLibraryItems", () => {
         name: "Old stored data",
       },
       {
+        id: "default-library-cloud",
+        status: "published" as const,
+        created: 6,
+        elements: firstItemElements(),
+        name: "Cloud",
+      },
+      {
         id: "user-item",
         status: "unpublished" as const,
         created: 5,
@@ -143,9 +150,7 @@ describe("defaultLibraryItems", () => {
     expect(next.some((item) => item.id === "default-library-horizontal-cylinder")).toBe(false);
     expect(next.some((item) => item.id === "default-library-stored-data")).toBe(false);
     expect(next.find((item) => item.id === "user-item")?.name).toBe("User item");
-    expect(next.find((item) => item.id === "default-library-cloud")?.name).toBe(
-      "云朵",
-    );
+    expect(next.some((item) => item.id === "default-library-cloud")).toBe(false);
     expect(
       next.find((item) => item.id === "default-library-bidirectional-arrow")
         ?.name,

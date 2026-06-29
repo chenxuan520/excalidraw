@@ -32,6 +32,7 @@ const LEGACY_REMOVED_DEFAULT_LIBRARY_ITEM_IDS = [
   makeItemId("right-brace"),
   makeItemId("stored-data"),
   makeItemId("horizontal-cylinder"),
+  makeItemId("cloud"),
 ] as const;
 
 export const MANAGED_DEFAULT_LIBRARY_ITEM_IDS = new Set<string>([
@@ -40,9 +41,9 @@ export const MANAGED_DEFAULT_LIBRARY_ITEM_IDS = new Set<string>([
   makeItemId("left-arrow"),
   makeItemId("right-arrow"),
   makeItemId("bidirectional-arrow"),
-  makeItemId("cloud"),
   makeItemId("database"),
   makeItemId("message-queue"),
+  makeItemId("stick-figure"),
   ...LEGACY_REMOVED_DEFAULT_LIBRARY_ITEM_IDS,
 ]);
 
@@ -282,35 +283,6 @@ const createBidirectionalArrowItem = (name: string) =>
     [0, 30],
   ]);
 
-const createCloudItem = (name: string) =>
-  createFilledPolygonItem("cloud", 6, name, 1006, [
-    [16, 58],
-    [6, 50],
-    [0, 38],
-    [4, 26],
-    [14, 18],
-    [24, 12],
-    [30, 4],
-    [42, 0],
-    [54, 4],
-    [66, 0],
-    [78, 4],
-    [88, 12],
-    [98, 18],
-    [106, 26],
-    [110, 38],
-    [106, 50],
-    [98, 58],
-    [88, 64],
-    [78, 70],
-    [66, 74],
-    [54, 70],
-    [42, 74],
-    [30, 70],
-    [20, 64],
-    [16, 58],
-  ]);
-
 const createDatabaseItem = (name: string, label: string) => {
   const groupId = `${makeItemId("database")}-group`;
   const width = 104;
@@ -426,6 +398,58 @@ const createMessageQueueItem = (name: string, label: string) => {
   ]);
 };
 
+const createStickFigureItem = (name: string) => {
+  const groupId = `${makeItemId("stick-figure")}-group`;
+
+  return createBuiltinLibraryItem("stick-figure", 9, name, [
+    createEllipseSkeleton(
+      `${makeItemId("stick-figure")}-head`,
+      1017,
+      22,
+      0,
+      44,
+      44,
+      { groupIds: [groupId] },
+    ),
+    createLineSkeleton(
+      `${makeItemId("stick-figure")}-body`,
+      1018,
+      [
+        [0, 0],
+        [0, 52],
+      ],
+      { x: 44, y: 44, groupIds: [groupId] },
+    ),
+    createLineSkeleton(
+      `${makeItemId("stick-figure")}-arms`,
+      1019,
+      [
+        [0, 0],
+        [60, 0],
+      ],
+      { x: 14, y: 64, groupIds: [groupId] },
+    ),
+    createLineSkeleton(
+      `${makeItemId("stick-figure")}-left-leg`,
+      1020,
+      [
+        [24, 0],
+        [0, 34],
+      ],
+      { x: 20, y: 96, groupIds: [groupId] },
+    ),
+    createLineSkeleton(
+      `${makeItemId("stick-figure")}-right-leg`,
+      1021,
+      [
+        [0, 0],
+        [24, 34],
+      ],
+      { x: 44, y: 96, groupIds: [groupId] },
+    ),
+  ]);
+};
+
 const getDefaultLibraryItemNames = (langCode: string) => {
   return {
     star: getDefaultLibraryText(langCode, "defaultLibraryItems.star.name"),
@@ -442,7 +466,6 @@ const getDefaultLibraryItemNames = (langCode: string) => {
       langCode,
       "defaultLibraryItems.bidirectionalArrow.name",
     ),
-    cloud: getDefaultLibraryText(langCode, "defaultLibraryItems.cloud.name"),
     database: getDefaultLibraryText(
       langCode,
       "defaultLibraryItems.database.name",
@@ -459,6 +482,10 @@ const getDefaultLibraryItemNames = (langCode: string) => {
       langCode,
       "defaultLibraryItems.messageQueue.label",
     ),
+    stickFigure: getDefaultLibraryText(
+      langCode,
+      "defaultLibraryItems.stickFigure.name",
+    ),
   };
 };
 
@@ -471,9 +498,9 @@ export const getDefaultLibraryItems = (langCode: string): LibraryItems => {
     createLeftArrowItem(names.leftArrow),
     createRightArrowItem(names.rightArrow),
     createBidirectionalArrowItem(names.bidirectionalArrow),
-    createCloudItem(names.cloud),
     createDatabaseItem(names.database, names.databaseLabel),
     createMessageQueueItem(names.messageQueue, names.messageQueueLabel),
+    createStickFigureItem(names.stickFigure),
   ];
 };
 

@@ -239,7 +239,7 @@ export const MindMapNodeHandles = () => {
       >
         <MindMapPlusIcon />
       </button>
-      {canAddSibling && (
+      {canAddSibling && siblingPreview && (
         <button
           type="button"
           className="mind-map-node-handles__button mind-map-node-handles__button--sibling"

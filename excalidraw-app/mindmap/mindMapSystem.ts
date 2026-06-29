@@ -831,18 +831,17 @@ const getTimelineVerticalNodeX = (
   return parentBox.centerX - childWidth / 2;
 };
 
-const createTimelineHorizontalTrunkPoints = (
+const createTimelineHorizontalCenterPoints = (
   parentBox: Box,
-  childBoxes: readonly Box[],
-  childLanes: readonly (MindMapLane | undefined)[],
+  childBox: Box,
+  axisY: number,
 ) => {
-  const starts = childBoxes.map((box, index) =>
-    childLanes[index] === "center" ? box.x - TIMELINE_TEXT_GAP * 2 : box.x - TIMELINE_TEXT_GAP,
-  );
+  // Connect consecutive center nodes edge-to-edge so the main axis reads as a
+  // single continuous timeline instead of floating, gapped segments.
   return [
-    [parentBox.right + TIMELINE_TEXT_GAP, parentBox.centerY],
-    [Math.max(...starts), parentBox.centerY],
-  ].map(([x, y]) => [x, y] as [number, number]);
+    [parentBox.right, axisY],
+    [childBox.x, axisY],
+  ] as const;
 };
 
 const createTimelineVerticalTrunkPoints = (
@@ -857,24 +856,6 @@ const createTimelineVerticalTrunkPoints = (
     [parentBox.centerX, parentBox.bottom + 12],
     [parentBox.centerX, Math.max(...ends)],
   ].map(([x, y]) => [x, y] as [number, number]);
-};
-
-const createTimelineHorizontalLeafPoints = (
-  childBox: Box,
-  lane: MindMapLane | undefined,
-  axisY: number,
-) => {
-  const entryX = childBox.x - TIMELINE_TEXT_GAP;
-  if (lane === "center") {
-    return [
-      [entryX - TIMELINE_TEXT_GAP, axisY],
-      [entryX, axisY],
-    ] as const;
-  }
-  return [
-    [entryX, axisY],
-    [entryX, childBox.centerY],
-  ] as const;
 };
 
 const createTimelineVerticalLeafPoints = (
@@ -1289,10 +1270,107 @@ const layoutMindMapTree = (tree: MindMapTree) => {
   return positions;
 };
 
-export const synchronizeMindMapElements = (
+const repairMindMapReferences = (
   elements: readonly OrderedExcalidrawElement[],
+): { changed: boolean; elements: readonly OrderedExcalidrawElement[] } => {
+  // When a mind map is inserted from the library, pasted, dragged in, or
+  // duplicated, the host regenerates every element id (see `duplicateElements`)
+  // but has no knowledge of the id references we keep inside
+  // `customData.mindMap` (nodeId/parentId/sourceId/targetId/cascadeDeletedBy).
+  // Those references keep pointing at the original stencil ids that no longer
+  // exist, so the sync below treats every node as an orphan with a missing
+  // parent and cascade-deletes it. Horizontal timelines survive by accident
+  // (a leaf connector per node lets `resolveConnectorNodes` re-derive the tree
+  // geometrically) but vertical timelines only ship a single trunk connector,
+  // so the middle nodes are lost and the whole template collapses to its root.
+  //
+  // We repair this losslessly: for every live root/node element its own (stale)
+  // `nodeId` maps to its current element id, which lets us remap any dangling
+  // reference back onto the live element. References that resolve to neither a
+  // live element nor a known stale id (e.g. a genuinely deleted root) are left
+  // untouched so real orphan/cascade deletion keeps working.
+  const liveElementIds = new Set<string>();
+  for (const element of elements) {
+    if (!element.isDeleted) {
+      liveElementIds.add(element.id);
+    }
+  }
+
+  const staleNodeIdToElementId = new Map<string, string>();
+  for (const element of elements) {
+    if (
+      element.isDeleted ||
+      (!isMindMapRootElement(element) && !isMindMapNodeElement(element))
+    ) {
+      continue;
+    }
+    const nodeId = getMindMapElementMeta(element)?.nodeId;
+    if (nodeId && nodeId !== element.id && !staleNodeIdToElementId.has(nodeId)) {
+      staleNodeIdToElementId.set(nodeId, element.id);
+    }
+  }
+
+  if (!staleNodeIdToElementId.size) {
+    return { changed: false, elements };
+  }
+
+  const resolveReference = (id: string | undefined) => {
+    if (!id || liveElementIds.has(id)) {
+      return id;
+    }
+    return staleNodeIdToElementId.get(id) || id;
+  };
+
+  let changed = false;
+  const repaired = elements.map((element) => {
+    const meta = getMindMapElementMeta(element);
+    if (!meta) {
+      return element;
+    }
+
+    const isNode =
+      isMindMapRootElement(element) || isMindMapNodeElement(element);
+    const nextNodeId = isNode ? element.id : meta.nodeId;
+    const nextParentId = resolveReference(meta.parentId);
+    const nextSourceId = resolveReference(meta.sourceId);
+    const nextTargetId = resolveReference(meta.targetId);
+    const nextCascadeDeletedBy = resolveReference(meta.cascadeDeletedBy);
+
+    if (
+      nextNodeId === meta.nodeId &&
+      nextParentId === meta.parentId &&
+      nextSourceId === meta.sourceId &&
+      nextTargetId === meta.targetId &&
+      nextCascadeDeletedBy === meta.cascadeDeletedBy
+    ) {
+      return element;
+    }
+
+    changed = true;
+    return newElementWith(element, {
+      customData: {
+        ...element.customData,
+        mindMap: {
+          ...meta,
+          nodeId: nextNodeId,
+          parentId: nextParentId,
+          sourceId: nextSourceId,
+          targetId: nextTargetId,
+          cascadeDeletedBy: nextCascadeDeletedBy,
+        },
+      },
+    }) as OrderedExcalidrawElement;
+  });
+
+  return changed ? { changed: true, elements: repaired } : { changed: false, elements };
+};
+
+export const synchronizeMindMapElements = (
+  inputElements: readonly OrderedExcalidrawElement[],
   _selectedElementIds?: SelectedElementIds,
 ) => {
+  const { changed: referencesRepaired, elements } =
+    repairMindMapReferences(inputElements);
   const restoredCascadeNodeIds = new Set<string>();
   let restoredDiscovered = true;
   while (restoredDiscovered) {
@@ -1446,7 +1524,9 @@ export const synchronizeMindMapElements = (
     }
   }
 
-  let changed = restoredElements.some((element, index) => element !== elements[index]);
+  let changed =
+    referencesRepaired ||
+    restoredElements.some((element, index) => element !== elements[index]);
   const baseElements = restoredElements.map((element) => {
     if (element.isDeleted) {
       return element;
@@ -1558,34 +1638,28 @@ export const synchronizeMindMapElements = (
         }
 
         const centerChildren = children.filter((child) => child.lane === "center");
-        const branchChildren = children.filter((child) => child.lane !== "center");
 
         const parentBox = getPositionedBox(parent);
-        const childBoxes = centerChildren.map((child) => getPositionedBox(child));
-        const childLanes = centerChildren.map((child) => child.lane);
         const trunkKey = getTimelineTrunkConnectorKey(parent.id);
         const existingTrunk = tree.trunkConnectorsByKey.get(trunkKey)?.element;
         if (existingTrunk) {
           unusedConnectorIds.delete(existingTrunk.id);
         }
 
+        // Vertical timelines draw a single trunk down the main axis. Horizontal
+        // timelines instead connect consecutive center nodes edge-to-edge (see
+        // the per-child connector below), so they never create a trunk.
         const shouldCreateTrunk =
-          centerChildren.length &&
-          (orientation === "horizontal" || parent.id === tree.root.id);
+          centerChildren.length > 0 &&
+          orientation === "vertical" &&
+          parent.id === tree.root.id;
 
         if (shouldCreateTrunk) {
-          const trunkPoints =
-            orientation === "horizontal"
-              ? createTimelineHorizontalTrunkPoints(
-                  parentBox,
-                  childBoxes,
-                  childLanes,
-                )
-              : createTimelineVerticalTrunkPoints(
-                  { ...timelineRootBox, centerX: timelineAxisX },
-                  timelineCenterBoxes,
-                  timelineCenterNodes.map((node) => node.lane),
-                );
+          const trunkPoints = createTimelineVerticalTrunkPoints(
+            { ...timelineRootBox, centerX: timelineAxisX },
+            timelineCenterBoxes,
+            timelineCenterNodes.map((node) => node.lane),
+          );
           const nextTrunk = createConnectorElement({
             connector: existingTrunk,
             sourceId: parent.id,
@@ -1618,10 +1692,10 @@ export const synchronizeMindMapElements = (
           const points =
             child.lane === "center"
               ? orientation === "horizontal"
-                ? createTimelineHorizontalLeafPoints(
+                ? createTimelineHorizontalCenterPoints(
+                    parentBox,
                     childBox,
-                    child.lane,
-                    parentBox.centerY,
+                    timelineRootBox.centerY,
                   )
                 : createTimelineVerticalLeafPoints(
                     childBox,
@@ -2231,6 +2305,29 @@ export const insertMindMapNode = ({
     selectedMindMapNode.lane !== "center"
   ) {
     return null;
+  }
+
+  // A timeline center node carries at most one branch (on its alternating
+  // side). Once that branch exists, adding another would just duplicate it, so
+  // the sibling/branch insert is disallowed (and the handle is hidden).
+  if (
+    selectedMindMapNode &&
+    mode === "sibling" &&
+    isMindMapTimelineTemplate(tree.template) &&
+    selectedMindMapNode.lane === "center"
+  ) {
+    const branchLane = getNextTimelineLane({
+      tree,
+      parent: selectedMindMapNode,
+      node: selectedMindMapNode,
+      mode: "sibling",
+    });
+    const hasBranchOnLane = selectedMindMapNode.children.some(
+      (childId) => tree.nodes.get(childId)?.lane === branchLane,
+    );
+    if (hasBranchOnLane) {
+      return null;
+    }
   }
 
   const insertedElements =

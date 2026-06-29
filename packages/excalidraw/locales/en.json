@@ -763,9 +763,6 @@
     "bidirectionalArrow": {
       "name": "Bidirectional arrow"
     },
-    "cloud": {
-      "name": "Cloud"
-    },
     "database": {
       "name": "Database",
       "label": "Database"
@@ -773,6 +770,9 @@
     "messageQueue": {
       "name": "Message Queue",
       "label": "Queue"
+    },
+    "stickFigure": {
+      "name": "Stick figure"
     }
   },
   "quickSearch": {

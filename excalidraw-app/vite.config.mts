@@ -13,6 +13,8 @@ const envVars = loadEnv("", `../`);
 export default defineConfig(({ command }) => ({
   server: {
     port: Number(envVars.VITE_APP_PORT || 3000),
+    // listen on all interfaces (127.0.0.1, localhost, LAN IP)
+    host: true,
     // open the browser
     open: true,
   },

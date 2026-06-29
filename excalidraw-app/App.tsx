@@ -1908,8 +1908,6 @@ const ExcalidrawWrapper = () => {
           onOpenLogin={() => setWebDAVLoginOpen(true)}
           onOpenManager={() => setWebDAVFileManagerOpen(true)}
           onOpenAlignmentAidsSettings={openAlignmentAidsSettings}
-          onOpenMindMap={openMindMapSidebar}
-          onOpenSequenceDiagram={openSequenceDiagramSidebar}
           onSave={() => saveCurrentSceneToWebDAV()}
           onLogout={handleWebDAVLogout}
           theme={appTheme}
